@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+
+# Model weights (do not commit)
+*.pth
+
+# Runtime-generated frames/plates (produced locally, not source-controlled)
+bgr.png
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
