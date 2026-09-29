@@ -115,8 +115,8 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="auto",
         choices=["auto", "mps", "cuda", "cpu"],
-        help="추론 장치 (기본값: auto — mps를 먼저 시도하고, 사용할 수 없거나 "
-        "런타임 오류가 나면 자동으로 cpu로 전환)",
+        help="추론 장치 (기본값: auto — cuda → mps 순서로 시도하고, 모두 "
+        "사용할 수 없거나 런타임 오류가 나면 자동으로 cpu로 전환)",
     )
     parser.add_argument(
         "--show-alpha",
@@ -129,24 +129,31 @@ def parse_args() -> argparse.Namespace:
 def resolve_device(device_arg: str) -> torch.device:
     """추론 장치를 결정합니다.
 
-    --device auto(기본값)일 때는 mps(Apple Silicon GPU)를 먼저 시도하고,
-    이 시스템에서 지원하지 않거나 실제 연산 중 오류가 나면 자동으로
-    cpu로 넘어갑니다. is_available() 체크만으로는 런타임 오류를 잡지
-    못하므로, 실제로 작은 텐서 연산을 한 번 실행해 확인합니다.
+    --device auto(기본값)일 때는 cuda(NVIDIA GPU) → mps(Apple Silicon GPU)
+    순서로 시도하고, 둘 다 지원하지 않거나 실제 연산 중 오류가 나면
+    자동으로 cpu로 넘어갑니다. is_available() 체크만으로는 런타임 오류를
+    잡지 못하므로, 각 장치에서 작은 텐서 연산을 한 번 실행해 확인합니다.
     """
     if device_arg != "auto":
         return torch.device(device_arg)
 
-    try:
-        if not torch.backends.mps.is_available():
-            raise RuntimeError("이 시스템에서 MPS 백엔드를 사용할 수 없습니다.")
-        device = torch.device("mps")
-        torch.zeros(1, device=device)  # 실제 동작 여부 확인
-        print("[정보] mps(Apple Silicon GPU) 장치를 사용합니다.")
-        return device
-    except Exception as exc:
-        print(f"[경고] mps 장치 사용 실패({exc}) — cpu로 전환합니다.")
-        return torch.device("cpu")
+    candidates = [
+        ("cuda", "NVIDIA GPU", lambda: torch.cuda.is_available()),
+        ("mps", "Apple Silicon GPU", lambda: torch.backends.mps.is_available()),
+    ]
+    for name, label, is_available in candidates:
+        try:
+            if not is_available():
+                continue
+            device = torch.device(name)
+            torch.zeros(1, device=device)  # 실제 동작 여부 확인
+            print(f"[정보] {name}({label}) 장치를 사용합니다.")
+            return device
+        except Exception as exc:
+            print(f"[경고] {name} 장치 사용 실패({exc}) — 다음 장치를 시도합니다.")
+
+    print("[정보] 사용 가능한 GPU가 없어 cpu로 동작합니다.")
+    return torch.device("cpu")
 
 
 def load_model(args: argparse.Namespace, device: torch.device):

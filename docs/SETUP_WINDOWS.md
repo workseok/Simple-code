@@ -98,9 +98,8 @@ NVIDIA GPU가 있고 최신 드라이버가 설치되어 있다면, PyTorch를 C
    python -c "import torch; print(torch.cuda.is_available())"
    ```
    `True`가 출력되면 GPU를 사용할 준비가 된 것입니다.
-4. **주의:** `realtime_matte.py`의 `--device` 기본값(`auto`)은 Windows에서
-   CPU로 동작합니다. GPU를 쓰려면 실행 시 반드시 `--device cuda`를
-   명시하세요 (9-3 단계 참고).
+   `realtime_matte.py`는 `--device` 기본값(`auto`)에서 GPU(CUDA)를 자동으로
+   사용합니다.
 
 ## 6. BackgroundMattingV2 공식 레포 clone
 
@@ -181,9 +180,10 @@ python realtime_matte.py \
 - 미리보기 창에서 `ESC`를 누르면 종료됩니다.
 - `--show-alpha` 옵션을 추가하면 합성 결과 옆에 알파 매트도 함께
   표시됩니다 (디버그용).
-- `--device` 옵션을 생략하면(기본값 `auto`) CPU로 동작합니다.
-  5단계에서 CUDA 지원 PyTorch를 설치했다면 명령 끝에 `--device cuda`를
-  추가해 GPU로 실행하세요.
+- `--device` 옵션을 생략하면(기본값 `auto`) GPU(CUDA)를 먼저 시도하고,
+  사용할 수 없으면 자동으로 CPU로 전환됩니다. 실행 직후 터미널에
+  `[정보] cuda(NVIDIA GPU) 장치를 사용합니다.`가 출력되는지 확인하세요.
+  특정 장치를 강제하려면 `--device cuda` 또는 `--device cpu`를 붙이세요.
 
 ---
 
