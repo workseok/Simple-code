@@ -7,6 +7,18 @@
 > ⚠️ 본 저장소는 `workseek/Part1_AI-test` (ComfyUI 클라우드 파이프라인)와
 > 완전히 독립적인 코드베이스입니다. 공유 함수/모듈을 두지 않습니다.
 
+## 설치 및 실행 가이드
+
+설치부터 실행까지는 사용 중인 OS에 맞는 문서를 참고하세요. 각 문서
+하나만 보면 처음부터 끝까지(필수 프로그램 설치 → 저장소 clone → 가상환경
+생성 → 의존성 설치 → 실행) 따라 할 수 있습니다.
+
+- 🪟 **Windows** → [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md)
+- 🍎 **macOS** → [docs/SETUP_MAC.md](docs/SETUP_MAC.md)
+
+코드베이스는 OS와 무관하게 하나로 유지되며, 저장소나 브랜치를 OS별로
+나누지 않습니다. 위 두 문서는 같은 코드에 대한 OS별 설치 절차만 다룹니다.
+
 ## 전제 조건
 
 - 카메라는 촬영 시작(배경 캡처 시점)부터 종료까지 **완전 고정**
@@ -22,55 +34,6 @@
 | `capture_background.py` | 리허설 단계에서 1회 실행. 피사체 없는 클린 배경 프레임을 캡처해 `bgr.png`로 저장 |
 | `realtime_matte.py` | `bgr.png` 기준으로 실시간 입력과 비교해 알파 매트 추출 후 AI 배경(`ai_background.png`)과 합성 |
 | `utils.py` | 두 스크립트가 공유하는 텐서 변환/합성 헬퍼 |
-
-## 환경 설정
-
-```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## 모델 코드 / 가중치
-
-`realtime_matte.py`는 모델 아키텍처(`MattingBase`/`MattingRefine`)를 이
-저장소에 포함하지 않습니다. BackgroundMattingV2 공식 레포를 별도로
-clone한 뒤 `--repo-path`로 경로를 넘기면 실행 시점에 `sys.path`에
-추가해 import합니다.
-
-```bash
-git clone https://github.com/PeterL1n/BackgroundMattingV2.git ../BackgroundMattingV2
-```
-
-가중치(`.pth`)는 공식 레포 README의 "Model / Checkpoints" 섹션 안내를
-따라 받아, 저장소 루트의 `models/` 디렉터리에 배치하세요
-(예: `models/pytorch_resnet50.pth`).
-
-- 공식 레포: https://github.com/PeterL1n/BackgroundMattingV2
-- 가중치 다운로드: 위 레포 README 참고
-
-`*.pth` 파일은 `.gitignore`에 등록되어 있으며 커밋되지 않습니다.
-
-## 사용 순서
-
-1. **배경 캡처** (리허설, 피사체 없이 1회):
-   ```bash
-   python capture_background.py --camera-index 0 --output bgr.png
-   ```
-   `SPACE`로 캡처, `ESC`로 취소. 이 시점 이후 촬영이 끝날 때까지
-   카메라를 움직이지 마세요.
-
-2. **실시간 매팅**:
-   ```bash
-   python realtime_matte.py \
-       --repo-path ../BackgroundMattingV2 \
-       --model-checkpoint models/pytorch_resnet50.pth \
-       --model-backbone resnet50 \
-       --bgr bgr.png \
-       --ai-background ai_background.png
-   ```
-   `ESC`로 종료. `--show-alpha`를 추가하면 합성 결과 옆에 알파 매트를
-   함께 표시합니다 (디버그용).
 
 ## 검증 순서
 
