@@ -19,6 +19,16 @@
 코드베이스는 OS와 무관하게 하나로 유지되며, 저장소나 브랜치를 OS별로
 나누지 않습니다. 위 두 문서는 같은 코드에 대한 OS별 설치 절차만 다룹니다.
 
+## GUI 앱 (macOS)
+
+미리보기 창만 뜨던 `realtime_matte.py` 대신, 단축키 안내·배경 번호 표시·오류 안내를 갖춘 GUI 앱을
+쓸 수 있습니다 (PySide6). 설치와 사용법은 [docs/APP_MAC.md](docs/APP_MAC.md)를 참고하세요.
+
+```bash
+pip install -r requirements-app.txt
+bash packaging/build_app.sh          # → dist/BG Matte.app
+```
+
 ## 전제 조건
 
 - 카메라는 촬영 시작(배경 캡처 시점)부터 종료까지 **완전 고정**

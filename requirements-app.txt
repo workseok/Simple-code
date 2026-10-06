@@ -1,0 +1,5 @@
+# GUI 앱(bgmatte_app) 추가 의존성. 기존 requirements.txt(opencv, numpy, torch)는 그대로 필요합니다.
+#   pip install -r requirements-app.txt
+PySide6>=6.5
+# 카메라 권한을 앱이 직접 확인/요청하기 위한 선택 패키지 (없어도 동작하지만 안내가 덜 정확해집니다)
+pyobjc-framework-AVFoundation>=9; sys_platform == "darwin"

@@ -17,3 +17,6 @@ bgr.png
 .DS_Store
 .idea/
 .vscode/
+
+# GUI app build output
+dist/

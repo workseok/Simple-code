@@ -1,0 +1,712 @@
+"""메인 창: 미리보기 + 단계 표시 + 알림 배너 + 오른쪽 콘솔(배경 번호·상태·단축키·알림 기록)."""
+
+from __future__ import annotations
+
+import logging
+import sys
+from datetime import datetime
+from typing import Callable, List, Optional, Sequence
+
+from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QCloseEvent, QColor, QDesktopServices, QFontMetrics, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .. import camera_auth, messages
+from ..backgrounds import BackgroundItem, scan_backgrounds
+from ..config import APP_NAME, Config, save_config
+from ..messages import Level, Notice
+from ..worker import PipelineWorker
+from . import theme
+from .dialogs import IntroDialog, SettingsDialog, probe_cameras
+from .widgets import BusRow, NoticeBanner, PreviewView, StepBar, TallyDot, hairline, keycaps, repolish
+
+log = logging.getLogger(__name__)
+
+ACTION_LABELS = {
+    "open_settings": "설정 열기",
+    "open_camera_privacy": "시스템 설정 열기",
+    "open_backgrounds": "배경 폴더 열기",
+    "restart": "다시 시작",
+    "capture": "배경 촬영 (B)",
+}
+
+STATE_VIEW = {
+    "idle": ("대기", theme.FAINT),
+    "starting": ("준비 중", theme.INFO),
+    "waiting_bg": ("배경 촬영 필요", theme.WAIT),
+    "running": ("실행 중", theme.LIVE),
+    "capturing": ("촬영 중", theme.STOP),
+    "stopped": ("정지됨", theme.FAINT),
+    "error": ("오류", theme.STOP),
+}
+
+STEP_HINT = (
+    "카메라에 연결하는 중입니다.",
+    "배경 이미지를 확인하는 중입니다.",
+    "모델을 불러오는 중입니다. 처음에는 몇 초 걸릴 수 있습니다.",
+    "합성을 시작하는 중입니다.",
+)
+
+LEVEL_COLOR = {
+    Level.INFO: theme.MUTED,
+    Level.SUCCESS: theme.LIVE,
+    Level.WARN: theme.WAIT,
+    Level.ERROR: theme.STOP,
+}
+
+_PREFS_KEYS = ("⌘", ",") if sys.platform == "darwin" else ("Ctrl", ",")
+SHORTCUTS = (
+    (("1", "–", "9"), "배경 번호로 바로 전환"),
+    (("←", "→"), "이전 / 다음 배경"),
+    (("B",), "빈 배경 촬영 (촬영 중에는 취소)"),
+    (("A",), "알파 매트 함께 보기"),
+    (("F",), "전체 화면"),
+    (("H",), "사용 안내"),
+    (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료"),
+    (_PREFS_KEYS, "설정"),
+)
+
+HISTORY_LIMIT = 50
+# 배너가 '빈 배경을 촬영하세요'를 안내하는 동안에는 미리보기 카드로 같은 말을 반복하지 않는다
+WAITING_PROMPTS = {"bgr_missing", "bgr_unreadable"}
+# 촬영이 시작되면 더는 필요 없는 안내
+CAPTURE_PROMPTS = WAITING_PROMPTS | {"bgr_size_mismatch"}
+
+
+def _default_worker_factory(cfg: Config, backgrounds: Sequence[BackgroundItem]) -> PipelineWorker:
+    return PipelineWorker(cfg, backgrounds)
+
+
+class _Bridge(QObject):
+    """워커 하나와 창 사이의 연결. 재시작 뒤에 늦게 도착한 이전 워커의 이벤트를 걸러냅니다."""
+
+    def __init__(self, window: "MainWindow", worker: PipelineWorker):
+        super().__init__(window)
+        self._w = window
+        self._worker = worker
+        worker.state_changed.connect(self.on_state)
+        worker.step_changed.connect(self.on_step)
+        worker.frame_ready.connect(self.on_frame)
+        worker.notify.connect(self.on_notify)
+        worker.background_changed.connect(self.on_background)
+        worker.fps_updated.connect(self.on_fps)
+        worker.stream_info.connect(self.on_info)
+        worker.capture_tick.connect(self.on_tick)
+        worker.alpha_changed.connect(self.on_alpha)
+        worker.finished.connect(self.on_finished)
+
+    def _live(self) -> bool:
+        return self._w._worker is self._worker
+
+    def on_state(self, state):
+        if self._live():
+            self._w._set_state(state)
+
+    def on_step(self, index, status):
+        if self._live():
+            self._w._on_step(index, status)
+
+    def on_frame(self, image):
+        if self._live():
+            self._w.preview.set_frame(image)
+            self._worker.ack_frame()
+
+    def on_notify(self, notice):
+        if self._live():
+            self._w._add_notice(notice)
+
+    def on_background(self, number, count, name):
+        if self._live():
+            self._w._on_background(number, count, name)
+
+    def on_fps(self, fps):
+        if self._live():
+            self._w._on_fps(fps)
+
+    def on_info(self, device, resolution):
+        if self._live():
+            self._w._on_info(device, resolution)
+
+    def on_tick(self, value):
+        if self._live():
+            self._w._on_tick(value)
+
+    def on_alpha(self, enabled):
+        if self._live():
+            self._w._on_alpha(enabled)
+
+    def on_finished(self):
+        self._w._on_worker_finished(self._worker)
+        self.deleteLater()  # 재시작할 때마다 브리지가 쌓이지 않도록 정리
+
+
+class MainWindow(QMainWindow):
+    permission_answered = Signal(bool)
+
+    def __init__(
+        self,
+        cfg: Config,
+        startup_warning: Optional[str] = None,
+        *,
+        worker_factory: Callable[[Config, Sequence[BackgroundItem]], PipelineWorker] = _default_worker_factory,
+        auth_status: Callable[[], str] = camera_auth.authorization_status,
+        auth_request: Callable[[Callable[[bool], None]], None] = camera_auth.request_access,
+        camera_probe: Callable[[], list] = probe_cameras,
+        save: Callable[[Config], None] = save_config,
+        open_url: Callable[[QUrl], object] = QDesktopServices.openUrl,
+        auto_start: bool = True,
+    ):
+        super().__init__()
+        self.cfg = cfg
+        self._startup_warning = startup_warning
+        self._worker_factory = worker_factory
+        self._auth_status = auth_status
+        self._auth_request = auth_request
+        self._camera_probe = camera_probe
+        self._save = save
+        self._open_url = open_url
+
+        self._worker: Optional[PipelineWorker] = None
+        self._retiring: List[PipelineWorker] = []
+        self._awaiting_permission = False
+        self._state = "idle"
+        self._step_text = ""
+        self._backgrounds: List[BackgroundItem] = []
+        self._current_bg = 0
+        self._fps = 0.0
+        self._alpha = False
+
+        self.setWindowTitle(APP_NAME)
+        self.resize(1240, 820)
+        self.setMinimumSize(1000, 660)
+        self._build_ui()
+        self._install_shortcuts()
+        self.permission_answered.connect(self._on_permission_answered)
+        self._set_state("idle")
+        self._scan_backgrounds()
+
+        if auto_start:
+            QTimer.singleShot(0, self._startup)
+
+    # ================================================================ UI 구성
+    def _build_ui(self) -> None:
+        central = QWidget()
+        central.setObjectName("console")
+        self.setCentralWidget(central)
+        root = QHBoxLayout(central)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(20)
+
+        # ---- 왼쪽: 단계 / 배너 / 미리보기
+        left = QVBoxLayout()
+        left.setSpacing(10)
+        self.steps = StepBar()
+        self.banner = NoticeBanner(ACTION_LABELS)
+        self.banner.action_requested.connect(self._on_action)
+        self.banner.cleared.connect(self._refresh_overlay)
+        self.preview = PreviewView()
+        self.footnote = QLabel("카메라는 빈 배경을 촬영한 뒤 움직이지 마세요.")
+        self.footnote.setObjectName("faint")
+        left.addWidget(self.steps)
+        left.addWidget(self.banner)
+        left.addWidget(self.preview, 1)
+        left.addWidget(self.footnote)
+        root.addLayout(left, 1)
+
+        # ---- 오른쪽: 콘솔
+        self.side = QWidget()
+        self.side.setFixedWidth(372)
+        side = QVBoxLayout(self.side)
+        side.setContentsMargins(0, 0, 0, 0)
+        side.setSpacing(12)
+
+        header = QHBoxLayout()
+        header.setSpacing(8)
+        title = QLabel(APP_NAME)
+        title.setObjectName("appTitle")
+        header.addWidget(title)
+        header.addStretch(1)
+        self.tally = TallyDot()
+        self.status_label = QLabel()
+        header.addWidget(self.tally)
+        header.addWidget(self.status_label)
+        side.addLayout(header)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        self.btn_toggle = QPushButton("시작")
+        self.btn_toggle.setObjectName("primary")
+        self.btn_capture = QPushButton("배경 촬영")
+        self.btn_settings = QPushButton("설정")
+        for b in (self.btn_toggle, self.btn_capture, self.btn_settings):
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 단축키가 버튼에 먹히지 않도록
+            buttons.addWidget(b)
+        self.btn_toggle.clicked.connect(self.toggle_pipeline)
+        self.btn_capture.clicked.connect(self.toggle_capture)
+        self.btn_settings.clicked.connect(self.open_settings)
+        side.addLayout(buttons)
+        side.addWidget(hairline())
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        body = QWidget()
+        body.setObjectName("console")
+        col = QVBoxLayout(body)
+        col.setContentsMargins(0, 0, 8, 0)
+        col.setSpacing(12)
+
+        # 합성 배경
+        row = QHBoxLayout()
+        t = QLabel("합성 배경")
+        t.setObjectName("sectionTitle")
+        row.addWidget(t)
+        self.bg_count = QLabel("")
+        self.bg_count.setObjectName("muted")
+        row.addWidget(self.bg_count)
+        row.addStretch(1)
+        self.btn_folder = QPushButton("폴더 열기")
+        self.btn_folder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_folder.setStyleSheet("padding: 3px 10px; font-size: 12px;")
+        self.btn_folder.clicked.connect(lambda: self._on_action("open_backgrounds"))
+        row.addWidget(self.btn_folder)
+        col.addLayout(row)
+        self.bus = BusRow()
+        self.bus.chosen.connect(self.select_background)
+        col.addWidget(self.bus)
+        self.bg_name = QLabel("")
+        self.bg_name.setObjectName("bgName")
+        self.bg_note = QLabel("")
+        self.bg_note.setObjectName("faint")
+        self.bg_note.setWordWrap(True)
+        col.addWidget(self.bg_name)
+        col.addWidget(self.bg_note)
+        col.addWidget(hairline())
+
+        # 상태
+        t = QLabel("상태")
+        t.setObjectName("sectionTitle")
+        col.addWidget(t)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+        self.val_device = QLabel("—")
+        self.val_resolution = QLabel("—")
+        self.val_fps = QLabel("—")
+        self.val_alpha = QLabel("꺼짐")
+        for r, (name, value) in enumerate(
+            (("처리 장치", self.val_device), ("해상도", self.val_resolution),
+             ("속도", self.val_fps), ("알파 보기", self.val_alpha))
+        ):
+            label = QLabel(name)
+            label.setObjectName("muted")
+            grid.addWidget(label, r, 0)
+            grid.addWidget(value, r, 1)
+        grid.setColumnStretch(1, 1)
+        col.addLayout(grid)
+        col.addWidget(hairline())
+
+        # 단축키
+        t = QLabel("단축키")
+        t.setObjectName("sectionTitle")
+        col.addWidget(t)
+        keys = QGridLayout()
+        keys.setHorizontalSpacing(14)
+        keys.setVerticalSpacing(6)
+        for r, (caps, text) in enumerate(SHORTCUTS):
+            keys.addWidget(keycaps(*caps), r, 0, Qt.AlignmentFlag.AlignVCenter)
+            label = QLabel(text)
+            label.setWordWrap(True)
+            keys.addWidget(label, r, 1, Qt.AlignmentFlag.AlignVCenter)
+        keys.setColumnMinimumWidth(0, 92)
+        keys.setColumnStretch(1, 1)
+        col.addLayout(keys)
+        col.addWidget(hairline())
+
+        # 알림 기록
+        t = QLabel("알림 기록")
+        t.setObjectName("sectionTitle")
+        col.addWidget(t)
+        self.history = QListWidget()
+        self.history.setObjectName("history")
+        self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.history.setMinimumHeight(110)
+        self.history.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        col.addWidget(self.history)
+        col.addStretch(1)
+
+        scroll.setWidget(body)
+        side.addWidget(scroll, 1)
+        root.addWidget(self.side)
+
+    def _install_shortcuts(self) -> None:
+        self._shortcuts: List[QShortcut] = []
+
+        def add(sequence, handler) -> None:
+            sc = QShortcut(QKeySequence(sequence), self)
+            sc.setContext(Qt.ShortcutContext.WindowShortcut)
+            sc.activated.connect(handler)
+            self._shortcuts.append(sc)
+
+        for n in range(1, 10):
+            add(str(n), lambda n=n: self.select_background(n))
+        add("Left", lambda: self.step_background(-1))
+        add("Right", lambda: self.step_background(+1))
+        add("B", self.toggle_capture)
+        add("A", self.toggle_alpha)
+        add("F", self.toggle_fullscreen)
+        add("H", self.show_intro)
+        add("Esc", self.on_escape)
+        add(QKeySequence.StandardKey.Preferences, self.open_settings)
+
+    # ================================================================ 시작/정지
+    def _startup(self) -> None:
+        if self._startup_warning:
+            self._add_notice(messages.config_corrupt(self._startup_warning))
+        if not self.cfg.seen_intro:
+            dialog = IntroDialog(self, show_checkbox=True)
+            dialog.exec()
+            if dialog.dont_show.isChecked():
+                self.cfg.seen_intro = True
+                self._persist()
+        self.start_pipeline()
+
+    def start_pipeline(self) -> None:
+        if self._worker is not None or self._awaiting_permission:
+            return
+        self.banner.clear()
+        self.steps.reset()
+        self._set_state("starting")
+        self._step_text = STEP_HINT[0]
+        self._refresh_overlay()
+
+        status = self._auth_status()
+        if status == "denied":
+            self._fail_with(messages.camera_permission_denied())
+            return
+        if status == "restricted":
+            self._fail_with(messages.camera_restricted())
+            return
+        if status == "not_determined":
+            self._awaiting_permission = True
+            self._refresh_buttons()  # 권한 팝업을 기다리는 동안에도 버튼은 '정지'
+            self._add_notice(messages.camera_permission_pending())
+            self._auth_request(self.permission_answered.emit)
+            return
+        self._launch_worker()
+
+    def _on_permission_answered(self, granted: bool) -> None:
+        if not self._awaiting_permission:
+            return
+        self._awaiting_permission = False
+        if granted:
+            self.banner.clear()
+            self._launch_worker()
+        else:
+            self._fail_with(messages.camera_permission_denied())
+
+    def _launch_worker(self) -> None:
+        self._scan_backgrounds()
+        worker = self._worker_factory(self.cfg, self._backgrounds)
+        self._worker = worker
+        _Bridge(self, worker)
+        worker.start()
+
+    def stop_pipeline(self) -> None:
+        was_waiting = self._awaiting_permission
+        self._awaiting_permission = False
+        worker = self._worker
+        if worker is None:
+            if was_waiting:  # 권한 팝업 응답을 기다리던 중에 정지
+                self.banner.clear()
+                self._set_state("stopped")
+                self.steps.reset()
+            return
+        self._worker = None  # 이후 이 워커가 보내는 이벤트는 무시됨
+        worker.request_stop()
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            finished = worker.wait(5000)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not finished:
+            self._retiring.append(worker)
+        self._set_state("stopped")
+        self.steps.reset()
+
+    def restart_pipeline(self) -> None:
+        self.stop_pipeline()
+        self.start_pipeline()
+
+    def toggle_pipeline(self) -> None:
+        if self._worker is not None or self._awaiting_permission:
+            self.stop_pipeline()
+        else:
+            self.start_pipeline()
+
+    def _on_worker_finished(self, worker: PipelineWorker) -> None:
+        # finished 시그널은 스레드가 끝나기 직전에 나갑니다. 완전히 끝난 것을 확인한 뒤에야
+        # 참조를 놓아야 'QThread: Destroyed while thread is still running' 오류가 나지 않습니다.
+        worker.wait(2000)
+        if self._worker is worker:
+            self._worker = None
+            self._refresh_buttons()
+        if worker in self._retiring:
+            self._retiring.remove(worker)
+
+    def _fail_with(self, notice: Notice) -> None:
+        self.steps.set_status(0, "error")
+        self._set_state("error")
+        self._add_notice(notice)
+
+    # ================================================================ 사용자 조작
+    def select_background(self, number: int) -> None:
+        if self._worker is None or self._state not in ("running", "capturing"):
+            self._add_notice(messages.bg_not_ready())
+            return
+        count = len(self._backgrounds)
+        if not 1 <= number <= count:
+            self._add_notice(messages.bg_invalid(number, count))
+            return
+        self._worker.select_background(number)
+
+    def step_background(self, delta: int) -> None:
+        if self._worker is None or self._state not in ("running", "capturing"):
+            self._add_notice(messages.bg_not_ready())
+            return
+        self._worker.step_background(delta)
+
+    def toggle_alpha(self) -> None:
+        if self._worker is not None and self._state in ("running", "capturing"):
+            self._worker.toggle_alpha()
+
+    def toggle_capture(self) -> None:
+        if self._worker is None:
+            self._add_notice(messages.capture_unavailable())
+        elif self._state == "capturing":
+            self._worker.cancel_capture()
+        elif self._state in ("waiting_bg", "running"):
+            self._worker.start_capture()
+        else:
+            self._add_notice(messages.capture_unavailable())
+
+    def toggle_fullscreen(self) -> None:
+        full = not self.isFullScreen()
+        if full:
+            self.showFullScreen()
+        else:
+            self.showNormal()
+        for w in (self.side, self.steps, self.footnote):
+            w.setVisible(not full)
+        self._update_hud()
+
+    def on_escape(self) -> None:
+        if self._state == "capturing" and self._worker is not None:
+            self._worker.cancel_capture()
+        elif self.isFullScreen():
+            self.toggle_fullscreen()
+        else:
+            self.close()
+
+    def show_intro(self) -> None:
+        IntroDialog(self).exec()
+
+    def open_settings(self) -> None:
+        was_active = self._worker is not None or self._awaiting_permission
+        self.stop_pipeline()  # 카메라를 놓아야 '카메라 찾기'가 동작합니다
+        dialog = SettingsDialog(self.cfg, self, camera_probe=self._camera_probe)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        if accepted:
+            self.cfg = dialog.result_config()
+            self._persist()
+            self._scan_backgrounds()
+        if was_active or accepted:
+            self.start_pipeline()
+
+    def _on_action(self, action: str) -> None:
+        if action == "open_settings":
+            self.open_settings()
+        elif action == "open_camera_privacy":
+            self._open_url(QUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"))
+        elif action == "open_backgrounds":
+            folder = self.cfg.resolve(self.cfg.backgrounds_dir)
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                log.exception("배경 폴더를 만들지 못했습니다")
+            self._open_url(QUrl.fromLocalFile(str(folder)))
+        elif action == "restart":
+            self.restart_pipeline()
+        elif action == "capture":
+            self.toggle_capture()
+
+    # ================================================================ 워커 이벤트 처리
+    def _set_state(self, state: str) -> None:
+        self._state = state
+        text, color = STATE_VIEW[state]
+        self.status_label.setText(text)
+        self.tally.set_color(color)
+        if state in ("idle", "starting", "stopped", "error"):
+            self.preview.clear_frame()
+            self.preview.set_countdown(None)
+            self._fps = 0.0
+            self.val_fps.setText("—")
+        if state in ("starting", "stopped", "error") and self._alpha:
+            self._on_alpha(False)
+        if state == "capturing" and self.banner.code in CAPTURE_PROMPTS:
+            self.banner.clear()
+        self._refresh_overlay()
+        self._refresh_buttons()
+        self._update_hud()
+
+    def _on_step(self, index: int, status: str) -> None:
+        self.steps.set_status(index, status)
+        if status == "active":
+            self._step_text = STEP_HINT[index]
+            self._refresh_overlay()
+
+    def _on_background(self, number: int, count: int, name: str) -> None:
+        self._current_bg = number
+        self.cfg.last_background = number
+        self._show_current_background(number, count, name)
+        self._update_hud()
+
+    def _on_fps(self, fps: float) -> None:
+        self._fps = fps
+        self.val_fps.setText(f"{fps:.1f} FPS")
+        self._update_hud()
+
+    def _on_info(self, device: str, resolution: str) -> None:
+        if device:
+            self.val_device.setText(device)
+            self.val_device.setToolTip(
+                "GPU를 쓸 수 없어 CPU로 처리합니다. 속도가 느릴 수 있습니다." if device.startswith("CPU") else ""
+            )
+        if resolution:
+            self.val_resolution.setText(resolution)
+
+    def _on_tick(self, value: int) -> None:
+        self.preview.set_countdown(None if value < 0 else value, self.cfg.countdown_seconds)
+
+    def _on_alpha(self, enabled: bool) -> None:
+        self._alpha = enabled
+        self.val_alpha.setText("켜짐 (오른쪽에 알파 매트 표시)" if enabled else "꺼짐")
+
+    # ================================================================ 화면 갱신
+    def _refresh_overlay(self) -> None:
+        s = self._state
+        if s == "starting":
+            self.preview.set_overlay("준비하는 중", self._step_text)
+        elif s == "waiting_bg":
+            if self.banner.code in WAITING_PROMPTS:
+                self.preview.clear_overlay()  # 배너가 같은 안내를 이미 보여주고 있음
+            else:
+                self.preview.set_overlay(
+                    "빈 배경을 촬영해 주세요",
+                    "피사체를 화면 밖으로 옮긴 뒤 B 키를 누르세요. 촬영한 뒤에는 카메라를 움직이지 마세요.",
+                )
+        elif s == "stopped":
+            self.preview.set_overlay("정지됨", "'시작' 버튼으로 다시 실행합니다.")
+        elif s == "error":
+            self.preview.set_overlay("실행하지 못했습니다", "위의 안내를 확인한 뒤 '다시 시작'을 눌러 주세요.")
+        else:
+            self.preview.clear_overlay()
+
+    def _refresh_buttons(self) -> None:
+        active = self._worker is not None or self._awaiting_permission
+        if active:
+            self.btn_toggle.setText("정지")
+        else:
+            self.btn_toggle.setText("다시 시작" if self._state == "error" else "시작")
+        can_capture = self._worker is not None and self._state in ("waiting_bg", "running", "capturing")
+        self.btn_capture.setEnabled(can_capture)
+        self.btn_capture.setText("촬영 취소" if self._state == "capturing" else "배경 촬영")
+        need_capture = self._state == "waiting_bg"
+        for button, name, value in ((self.btn_capture, "emphasis", need_capture), (self.btn_toggle, "demoted", need_capture)):
+            if button.property(name) != value:
+                button.setProperty(name, value)
+                repolish(button)
+
+    def _update_hud(self) -> None:
+        if self.isFullScreen() and self._state in ("running", "capturing") and self._current_bg:
+            self.preview.set_hud(f"배경 {self._current_bg}번   {self._fps:.1f} FPS")
+        else:
+            self.preview.set_hud("")
+
+    def _scan_backgrounds(self) -> None:
+        self._backgrounds = scan_backgrounds(
+            self.cfg.resolve(self.cfg.backgrounds_dir), self.cfg.resolve(self.cfg.legacy_background)
+        )
+        count = len(self._backgrounds)
+        self.bus.set_count(count)
+        if count == 0:
+            self._current_bg = 0
+            self.bus.set_current(0)
+            self.bg_count.setText("")
+            self.bg_name.setText("배경 이미지가 없습니다")
+            self.bg_note.setText("‘폴더 열기’로 backgrounds 폴더를 열고 PNG/JPG 파일을 넣어 주세요.")
+            return
+        number = min(max(self.cfg.last_background, 1), count)
+        self._current_bg = number
+        self._show_current_background(number, count, self._backgrounds[number - 1].name)
+
+    def _show_current_background(self, number: int, count: int, name: str) -> None:
+        self.bus.set_current(number)
+        self.bg_count.setText(f"{count}개 중 {number}번")
+        fm = QFontMetrics(self.bg_name.font())
+        self.bg_name.setText(fm.elidedText(name, Qt.TextElideMode.ElideMiddle, 340))
+        self.bg_name.setToolTip(name)
+        notes = []
+        if count > BusRow.SLOTS:
+            notes.append(f"{BusRow.SLOTS + 1}번부터는 ← → 키로 넘겨 주세요.")
+        self.bg_note.setText(" ".join(notes))
+        self.bg_note.setVisible(bool(notes))
+
+    def _add_notice(self, notice: Notice) -> None:
+        item = QListWidgetItem(f"{datetime.now():%H:%M:%S}   {notice.title}")
+        item.setForeground(QColor(LEVEL_COLOR[notice.level]))
+        tip = "\n".join(part for part in (notice.detail, notice.hint) if part)
+        if tip:
+            item.setToolTip(tip)
+        self.history.insertItem(0, item)
+        while self.history.count() > HISTORY_LIMIT:
+            self.history.takeItem(self.history.count() - 1)
+        if notice.banner:
+            self.banner.show_notice(notice)
+            self._refresh_overlay()
+
+    def _persist(self) -> None:
+        try:
+            self._save(self.cfg)
+        except Exception:
+            log.exception("설정을 저장하지 못했습니다")
+
+    # ================================================================ 종료
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._persist()
+        self._awaiting_permission = False
+        workers = list(self._retiring)
+        if self._worker is not None:
+            workers.append(self._worker)
+            self._worker = None
+        for worker in workers:
+            worker.request_stop()
+        for worker in workers:
+            if not worker.wait(4000):
+                log.warning("워커가 제때 끝나지 않아 강제 종료합니다")
+                worker.terminate()
+                worker.wait(1000)
+        event.accept()
