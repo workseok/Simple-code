@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -23,11 +24,39 @@ _WRAP_LEFT = Qt.AlignmentFlag.AlignLeft.value | Qt.TextFlag.TextWordWrap.value
 _CENTER = Qt.AlignmentFlag.AlignCenter.value
 
 
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+
+
+def app_icon() -> QIcon:
+    """앱 아이콘 (assets/icon.png). 파일이 없으면 빈 아이콘."""
+    path = ASSETS / "icon.png"
+    return QIcon(str(path)) if path.is_file() else QIcon()
+
+
+def app_icon_pixmap(size: int) -> QPixmap:
+    icon = app_icon()
+    return icon.pixmap(size, size) if not icon.isNull() else QPixmap(size, size)
+
+
 def repolish(widget: QWidget) -> None:
     """동적 프로퍼티(property) 값을 바꾼 뒤 스타일시트를 다시 적용합니다."""
     widget.style().unpolish(widget)
     widget.style().polish(widget)
     widget.update()
+
+
+def section_header(title: str, tone: str) -> QHBoxLayout:
+    """색 막대 + 제목. tone: brand | cyan | amber | pink"""
+    row = QHBoxLayout()
+    row.setSpacing(8)
+    marker = QFrame()
+    marker.setObjectName("marker")
+    marker.setProperty("tone", tone)
+    label = QLabel(title)
+    label.setObjectName("sectionTitle")
+    row.addWidget(marker)
+    row.addWidget(label)
+    return row
 
 
 def hairline() -> QFrame:
@@ -37,8 +66,8 @@ def hairline() -> QFrame:
     return line
 
 
-def keycaps(*keys: str, height: int = 22) -> QWidget:
-    """키캡 모양 라벨 묶음 (예: keycaps('Space'))."""
+def keycaps(*keys: str, height: int = 22, tone: str = "") -> QWidget:
+    """키캡 모양 라벨 묶음 (예: keycaps('Space', tone='pink')). tone은 키의 역할별 색입니다."""
     box = QWidget()
     row = QHBoxLayout(box)
     row.setContentsMargins(0, 0, 0, 0)
@@ -46,6 +75,8 @@ def keycaps(*keys: str, height: int = 22) -> QWidget:
     for key in keys:
         cap = QLabel(key)
         cap.setObjectName("keycap")
+        if tone:
+            cap.setProperty("tone", tone)
         cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cap.setFixedHeight(height)
         row.addWidget(cap)
@@ -216,17 +247,19 @@ class BusRow(QWidget):
 
     chosen = Signal(int)
     SLOTS = 9
+    HUES = ("brand", "cyan", "pink", "amber", "brand", "cyan", "pink", "amber", "brand")
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(4)
+        row.setSpacing(3)
         self._buttons: List[QPushButton] = []
         for i in range(self.SLOTS):
             button = QPushButton(str(i + 1))
             button.setObjectName("bus")
             button.setProperty("current", False)
+            button.setProperty("hue", self.HUES[i])
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 숫자/방향 키 단축키를 가로채지 않도록
             button.clicked.connect(lambda _=False, n=i + 1: self.chosen.emit(n))
             row.addWidget(button)
@@ -248,6 +281,8 @@ class BusRow(QWidget):
 class PreviewView(QWidget):
     """카메라/합성 영상을 비율 유지로 그리고, 그 위에 안내 문구·카운트다운·HUD를 얹습니다."""
 
+    FRAME = 4  # 테두리(탤리) 두께
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setMinimumSize(480, 270)
@@ -258,6 +293,7 @@ class PreviewView(QWidget):
         self._countdown: Optional[int] = None
         self._countdown_total = 1
         self._hud = ""
+        self._tally: Optional[str] = None
 
     # -- 상태 ---------------------------------------------------------------
     def set_frame(self, image: QImage) -> None:
@@ -283,24 +319,33 @@ class PreviewView(QWidget):
         self._countdown_total = max(total, 1)
         self.update()
 
+    def set_tally(self, key: Optional[str]) -> None:
+        """영상 테두리 색(팔레트 이름). 카메라의 탤리 램프처럼 현재 상태를 알려줍니다."""
+        if key != self._tally:
+            self._tally = key
+            self.update()
+
     def set_hud(self, text: str) -> None:
         self._hud = text
         self.update()
 
     # -- 그리기 ---------------------------------------------------------------
     def _image_rect(self) -> QRect:
+        box = self.rect().adjusted(self.FRAME, self.FRAME, -self.FRAME, -self.FRAME)
         if self._frame is None or self._frame.isNull():
-            return self.rect()
-        size = self._frame.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio)
+            return box
+        size = self._frame.size().scaled(box.size(), Qt.AspectRatioMode.KeepAspectRatio)
         return QRect(
-            QPoint((self.width() - size.width()) // 2, (self.height() - size.height()) // 2), size
+            QPoint(box.x() + (box.width() - size.width()) // 2, box.y() + (box.height() - size.height()) // 2), size
         )
 
     def paintEvent(self, _event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        p.fillRect(self.rect(), QColor(theme.color("MONITOR")))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(theme.color("MONITOR")))
+        p.drawRoundedRect(QRectF(self.rect()), 8, 8)
         image_rect = self._image_rect()
         if self._frame is not None and not self._frame.isNull():
             p.drawImage(image_rect, self._frame)
@@ -312,6 +357,13 @@ class PreviewView(QWidget):
 
         if self._hud:
             self._draw_hud(p, image_rect)
+
+        if self._tally:
+            half = self.FRAME / 2
+            pen = QPen(QColor(theme.color(self._tally)), self.FRAME)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(QRectF(self.rect()).adjusted(half, half, -half, -half), 8, 8)
 
     def _draw_card(self, p: QPainter, area: QRect, anchor_bottom: bool) -> None:
         max_w = min(area.width() - 48, 480)

@@ -52,6 +52,9 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setStyleSheet(theme.build_style())
+    from .ui.widgets import app_icon
+
+    app.setWindowIcon(app_icon())  # Dock/창 아이콘
 
     shown = {"done": False}
 

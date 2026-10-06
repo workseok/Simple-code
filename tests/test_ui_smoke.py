@@ -524,3 +524,20 @@ def test_theme_switch_applies_saves_and_recolors(harness):
 def test_saved_theme_is_used_at_startup(harness):
     h = harness(theme_name="light")
     assert theme.current().name == "light" and h.window._theme_buttons["light"].isChecked()
+
+
+def test_preview_border_light_follows_state_and_icon_assets_exist(harness):
+    from bgmatte_app.ui.widgets import ASSETS, app_icon
+
+    h = harness()
+    w = h.window
+    assert w.preview._tally is None
+    h.start_running()
+    assert w.preview._tally == "LIVE"
+    h.key(Qt.Key.Key_Space)
+    assert h.until(lambda: w._state == "capturing")
+    assert w.preview._tally == "STOP"
+    w.stop_pipeline()
+    assert w.preview._tally is None
+    assert (ASSETS / "icon.png").is_file() and not app_icon().isNull()
+    assert w.btn_toggle.property("running") is False

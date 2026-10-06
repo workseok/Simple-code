@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -32,7 +33,9 @@ from ..messages import Level, Notice
 from ..worker import PipelineWorker
 from . import theme
 from .dialogs import IntroDialog, SettingsDialog, probe_cameras
-from .widgets import BusRow, NoticeBanner, PreviewView, StepBar, TallyDot, hairline, keycaps, repolish
+from .widgets import (
+    BusRow, NoticeBanner, PreviewView, StepBar, TallyDot, app_icon_pixmap, keycaps, repolish, section_header,
+)
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +57,9 @@ STATE_VIEW = {
     "error": ("오류", "STOP"),
 }
 
+# 영상 테두리 불빛: 카메라의 탤리 램프처럼 현재 상태를 알려줍니다
+TALLY = {"starting": "INFO", "waiting_bg": "WAIT", "running": "LIVE", "capturing": "STOP", "error": "STOP"}
+
 STEP_HINT = (
     "카메라에 연결하는 중입니다.",
     "배경 이미지를 확인하는 중입니다.",
@@ -70,13 +76,13 @@ LEVEL_COLOR = {
 
 _PREFS_KEYS = ("⌘", ",") if sys.platform == "darwin" else ("Ctrl", ",")
 SHORTCUTS = (
-    (("1", "–", "9"), "배경 번호로 바로 전환"),
-    (("Space",), "빈 배경 촬영 (촬영 중에는 취소)"),
-    (("A",), "알파 매트 함께 보기"),
-    (("F",), "전체 화면"),
-    (("H",), "사용 안내"),
-    (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료"),
-    (_PREFS_KEYS, "설정"),
+    (("1", "–", "9"), "배경 번호로 바로 전환", "brand"),
+    (("Space",), "빈 배경 촬영 (촬영 중에는 취소)", "pink"),
+    (("A",), "알파 매트 함께 보기", "cyan"),
+    (("F",), "전체 화면", "cyan"),
+    (("H",), "사용 안내", "cyan"),
+    (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료", "amber"),
+    (_PREFS_KEYS, "설정", ""),
 )
 
 HISTORY_LIMIT = 50
@@ -233,6 +239,7 @@ class MainWindow(QMainWindow):
         self.btn_toggle = QPushButton("시작")
         self.btn_toggle.setObjectName("primary")
         self.btn_capture = QPushButton("배경 촬영")
+        self.btn_capture.setObjectName("capture")
         self.btn_settings = QPushButton("설정")
         for b in (self.btn_toggle, self.btn_capture, self.btn_settings):
             b.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 단축키(스페이스 등)가 버튼에 먹히지 않도록
@@ -250,13 +257,17 @@ class MainWindow(QMainWindow):
 
         # ---- 오른쪽: 콘솔
         self.side = QWidget()
-        self.side.setFixedWidth(340)
+        self.side.setFixedWidth(350)
         side = QVBoxLayout(self.side)
         side.setContentsMargins(0, 0, 0, 0)
-        side.setSpacing(12)
+        side.setSpacing(8)
 
         header = QHBoxLayout()
         header.setSpacing(8)
+        logo = QLabel()
+        logo.setPixmap(app_icon_pixmap(28))
+        logo.setFixedSize(28, 28)
+        header.addWidget(logo)
         title = QLabel(APP_NAME)
         title.setObjectName("appTitle")
         header.addWidget(title)
@@ -268,34 +279,47 @@ class MainWindow(QMainWindow):
         header.addWidget(self.tally)
         header.addWidget(self.status_label)
         side.addLayout(header)
-
-        side.addWidget(hairline())
+        accent = QFrame()
+        accent.setObjectName("accentLine")
+        side.addWidget(accent)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         body = QWidget()
         body.setObjectName("console")
-        col = QVBoxLayout(body)
-        col.setContentsMargins(0, 0, 8, 0)
-        col.setSpacing(12)
-        body_col = col
+        body_col = QVBoxLayout(body)
+        body_col.setContentsMargins(0, 4, 8, 0)
+        body_col.setSpacing(10)
+
+        def make_panel(title_text: str, tone: str, compact: bool):
+            frame = QFrame()
+            frame.setObjectName("panel")
+            outer = QVBoxLayout(frame)
+            outer.setContentsMargins(0, 0, 0, 0)
+            inner = QWidget()
+            if compact:  # 상태 · 단축키 · 알림 기록은 보조 정보라서 작은 글씨로 표시합니다.
+                inner.setObjectName("compact")
+            lay = QVBoxLayout(inner)
+            lay.setContentsMargins(12, 10, 12, 12)
+            lay.setSpacing(8)
+            head = section_header(title_text, tone)
+            lay.addLayout(head)
+            outer.addWidget(inner)
+            body_col.addWidget(frame)
+            return lay, head
 
         # 합성 배경
-        row = QHBoxLayout()
-        t = QLabel("합성 배경")
-        t.setObjectName("sectionTitle")
-        row.addWidget(t)
+        col, head = make_panel("합성 배경", "brand", compact=False)
         self.bg_count = QLabel("")
         self.bg_count.setObjectName("muted")
-        row.addWidget(self.bg_count)
-        row.addStretch(1)
+        head.addWidget(self.bg_count)
+        head.addStretch(1)
         self.btn_folder = QPushButton("폴더 열기")
         self.btn_folder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_folder.setStyleSheet("padding: 3px 10px; font-size: 12px;")
         self.btn_folder.clicked.connect(lambda: self._on_action("open_backgrounds"))
-        row.addWidget(self.btn_folder)
-        col.addLayout(row)
+        head.addWidget(self.btn_folder)
         self.bus = BusRow()
         self.bus.chosen.connect(self.select_background)
         col.addWidget(self.bus)
@@ -306,26 +330,16 @@ class MainWindow(QMainWindow):
         self.bg_note.setWordWrap(True)
         col.addWidget(self.bg_name)
         col.addWidget(self.bg_note)
-        col.addWidget(hairline())
-
-        # 아래 세 영역(상태 · 단축키 · 알림 기록)은 보조 정보라서 작은 글씨로 표시합니다.
-        compact = QWidget()
-        compact.setObjectName("compact")
-        col = QVBoxLayout(compact)
-        col.setContentsMargins(0, 0, 0, 0)
-        col.setSpacing(8)
-        body_col.addWidget(compact)
 
         # 상태
-        t = QLabel("상태")
-        t.setObjectName("sectionTitle")
-        col.addWidget(t)
+        col, _ = make_panel("상태", "cyan", compact=True)
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(3)
         self.val_device = QLabel("—")
         self.val_resolution = QLabel("—")
         self.val_fps = QLabel("—")
+        self.val_fps.setObjectName("fpsValue")
         self.val_alpha = QLabel("꺼짐")
         for r, (name, value) in enumerate(
             (("처리 장치", self.val_device), ("해상도", self.val_resolution),
@@ -337,29 +351,23 @@ class MainWindow(QMainWindow):
             grid.addWidget(value, r, 1)
         grid.setColumnStretch(1, 1)
         col.addLayout(grid)
-        col.addWidget(hairline())
 
-        # 단축키
-        t = QLabel("단축키")
-        t.setObjectName("sectionTitle")
-        col.addWidget(t)
+        # 단축키 (키 역할별로 색을 나눔: 배경 번호=보라, 촬영=분홍, 보기=청록, 종료=노랑)
+        col, _ = make_panel("단축키", "amber", compact=True)
         keys = QGridLayout()
         keys.setHorizontalSpacing(12)
         keys.setVerticalSpacing(4)
-        for r, (caps, text) in enumerate(SHORTCUTS):
-            keys.addWidget(keycaps(*caps, height=18), r, 0, Qt.AlignmentFlag.AlignVCenter)
+        for r, (caps, text, tone) in enumerate(SHORTCUTS):
+            keys.addWidget(keycaps(*caps, height=18, tone=tone), r, 0, Qt.AlignmentFlag.AlignVCenter)
             label = QLabel(text)
             label.setWordWrap(True)
             keys.addWidget(label, r, 1, Qt.AlignmentFlag.AlignVCenter)
         keys.setColumnMinimumWidth(0, 78)
         keys.setColumnStretch(1, 1)
         col.addLayout(keys)
-        col.addWidget(hairline())
 
         # 알림 기록
-        t = QLabel("알림 기록")
-        t.setObjectName("sectionTitle")
-        col.addWidget(t)
+        col, _ = make_panel("알림 기록", "pink", compact=True)
         self.history = QListWidget()
         self.history.setObjectName("history")
         self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -625,6 +633,7 @@ class MainWindow(QMainWindow):
             self._on_alpha(False)
         if state == "capturing" and self.banner.code in CAPTURE_PROMPTS:
             self.banner.clear()
+        self.preview.set_tally(TALLY.get(state))
         self._refresh_overlay()
         self._refresh_buttons()
         self._update_hud()
@@ -684,6 +693,9 @@ class MainWindow(QMainWindow):
 
     def _refresh_buttons(self) -> None:
         active = self._worker is not None or self._awaiting_permission
+        if self.btn_toggle.property("running") != active:
+            self.btn_toggle.setProperty("running", active)
+            repolish(self.btn_toggle)
         if active:
             self.btn_toggle.setText("정지")
         else:
