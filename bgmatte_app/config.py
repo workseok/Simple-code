@@ -23,6 +23,7 @@ MODEL_TYPES = ("mattingrefine", "mattingbase")
 BACKBONES = ("resnet50", "resnet101", "mobilenetv2")
 REFINE_MODES = ("full", "sampling", "thresholding")
 DEVICES = ("auto", "mps", "cuda", "cpu")
+THEMES = ("dark", "light")
 
 
 def config_dir() -> Path:
@@ -68,6 +69,7 @@ class Config:
     # 앱 상태
     last_background: int = 1
     seen_intro: bool = False
+    theme: str = "dark"  # 화면 테마: dark(어둡게) | light(밝게)
 
     def resolve(self, value: str) -> Path:
         return resolve_path(value)
@@ -88,6 +90,7 @@ class Config:
         pick("backbone", BACKBONES)
         pick("refine_mode", REFINE_MODES)
         pick("device", DEVICES)
+        pick("theme", THEMES)
 
         values["backbone_scale"] = min(max(values["backbone_scale"], 0.1), 1.0)
         values["refine_sample_pixels"] = max(values["refine_sample_pixels"], 1_000)

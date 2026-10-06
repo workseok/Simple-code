@@ -37,8 +37,8 @@ def hairline() -> QFrame:
     return line
 
 
-def keycaps(*keys: str) -> QWidget:
-    """키캡 모양 라벨 묶음 (예: keycaps('←', '→'))."""
+def keycaps(*keys: str, height: int = 22) -> QWidget:
+    """키캡 모양 라벨 묶음 (예: keycaps('Space'))."""
     box = QWidget()
     row = QHBoxLayout(box)
     row.setContentsMargins(0, 0, 0, 0)
@@ -47,7 +47,7 @@ def keycaps(*keys: str) -> QWidget:
         cap = QLabel(key)
         cap.setObjectName("keycap")
         cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cap.setFixedHeight(22)
+        cap.setFixedHeight(height)
         row.addWidget(cap)
     row.addStretch(1)
     return box
@@ -58,17 +58,18 @@ class TallyDot(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setFixedSize(12, 12)
-        self._color = QColor(theme.FAINT)
+        self._key = "FAINT"
 
-    def set_color(self, color: str) -> None:
-        self._color = QColor(color)
+    def set_color(self, key: str) -> None:
+        """팔레트 색 이름(예: 'LIVE')으로 지정합니다. 테마를 바꾸면 자동으로 새 색을 따라갑니다."""
+        self._key = key
         self.update()
 
     def paintEvent(self, _event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(self._color)
+        p.setBrush(QColor(theme.color(self._key)))
         p.drawEllipse(self.rect().adjusted(1, 1, -1, -1))
 
 
@@ -299,7 +300,7 @@ class PreviewView(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        p.fillRect(self.rect(), QColor(theme.MONITOR))
+        p.fillRect(self.rect(), QColor(theme.color("MONITOR")))
         image_rect = self._image_rect()
         if self._frame is not None and not self._frame.isNull():
             p.drawImage(image_rect, self._frame)
@@ -336,11 +337,11 @@ class PreviewView(QWidget):
         p.setBrush(QColor(30, 31, 34, 230))
         p.drawRoundedRect(QRectF(card), 6, 6)
         p.setFont(title_font)
-        p.setPen(QColor(theme.TEXT))
+        p.setPen(QColor(theme.ON_MONITOR_TEXT))
         p.drawText(QRect(x + pad, y + pad, inner_w, title_h), _WRAP_LEFT, self._title)
         if self._body:
             p.setFont(body_font)
-            p.setPen(QColor(theme.MUTED))
+            p.setPen(QColor(theme.ON_MONITOR_MUTED))
             p.drawText(QRect(x + pad, y + pad + title_h + 8, inner_w, body_h), _WRAP_LEFT, self._body)
 
     def _draw_countdown(self, p: QPainter, area: QRect) -> None:
@@ -355,7 +356,7 @@ class PreviewView(QWidget):
         p.drawEllipse(ring)
         if value > 0:
             fraction = min(value / self._countdown_total, 1.0)
-            pen = QPen(QColor(theme.STOP), 6)
+            pen = QPen(QColor(theme.ON_MONITOR_STOP), 6)
             pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             p.setPen(pen)
             p.drawArc(ring, 90 * 16, int(-360 * 16 * fraction))
@@ -364,7 +365,7 @@ class PreviewView(QWidget):
         font.setPixelSize(int(size * 0.5))
         font.setWeight(QFont.Weight.Bold)
         p.setFont(font)
-        p.setPen(QColor(theme.TEXT))
+        p.setPen(QColor(theme.ON_MONITOR_TEXT))
         p.drawText(ring, _CENTER, str(value) if value > 0 else "●")
 
         caption_font = QFont(self.font())
@@ -385,5 +386,5 @@ class PreviewView(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(0, 0, 0, 150))
         p.drawRoundedRect(QRectF(box), 4, 4)
-        p.setPen(QColor(theme.TEXT))
+        p.setPen(QColor(theme.ON_MONITOR_TEXT))
         p.drawText(box, _CENTER, self._hud)

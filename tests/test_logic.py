@@ -202,3 +202,11 @@ def test_notice_error_carries_notice():
     with pytest.raises(messages.NoticeError) as info:
         raise messages.NoticeError(n)
     assert info.value.notice is n
+
+
+def test_theme_setting_is_validated():
+    from bgmatte_app.config import Config
+
+    assert Config(theme="light").validated().theme == "light"
+    assert Config(theme="neon").validated().theme == "dark"
+    assert Config().theme == "dark"

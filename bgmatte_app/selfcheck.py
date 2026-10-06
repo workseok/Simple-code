@@ -57,7 +57,7 @@ def main() -> int:
     if bgr_path.is_file():
         _ok(f"빈 배경 {bgr_path.name}")
     else:
-        print(f"  - 빈 배경({bgr_path.name})이 아직 없습니다. 앱에서 B 키로 촬영하면 만들어집니다.")
+        print(f"  - 빈 배경({bgr_path.name})이 아직 없습니다. 앱에서 스페이스바로 촬영하면 만들어집니다.")
 
     print("\n[3] 모델")
     try:

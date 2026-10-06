@@ -20,7 +20,7 @@ from bgmatte_app import messages  # noqa: E402
 from bgmatte_app.config import Config  # noqa: E402
 from bgmatte_app.ui import main_window as mw  # noqa: E402
 from bgmatte_app.ui.dialogs import IntroDialog, SettingsDialog  # noqa: E402
-from bgmatte_app.ui.theme import STYLE  # noqa: E402
+from bgmatte_app.ui import theme  # noqa: E402
 from bgmatte_app.ui.widgets import NoticeBanner  # noqa: E402
 from bgmatte_app.worker import PipelineWorker  # noqa: E402
 from fakes import FakeCamera, FakeMatter, synthetic_frame  # noqa: E402
@@ -29,7 +29,7 @@ from fakes import FakeCamera, FakeMatter, synthetic_frame  # noqa: E402
 @pytest.fixture(scope="session")
 def qapp():
     app = QApplication.instance() or QApplication([])
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(theme.build_style())
     return app
 
 
@@ -51,7 +51,7 @@ def wait_until(qapp, predicate, timeout=6.0):
 
 
 class Harness:
-    def __init__(self, qapp, tmp_path, n_bg=3, with_bgr=True, auth="authorized", camera_kwargs=None):
+    def __init__(self, qapp, tmp_path, n_bg=3, with_bgr=True, auth="authorized", camera_kwargs=None, theme_name="dark"):
         self.qapp = qapp
         self.tmp = tmp_path
         self.folder = tmp_path / "backgrounds"
@@ -68,6 +68,7 @@ class Harness:
             countdown_seconds=1,
             average_frames=3,
             seen_intro=True,
+            theme=theme_name,
         )
         self.saved = []
         self.opened = []
@@ -136,6 +137,8 @@ def harness(qapp, tmp_path):
     yield make
     for h in made:
         h.close()
+    theme.set_theme("dark")  # 테마는 전역 상태라서 다음 테스트에 새지 않게 되돌림
+    qapp.setStyleSheet(theme.build_style())
 
 
 # ---------------------------------------------------------------- 시작
@@ -155,23 +158,27 @@ def test_starts_and_shows_running_state(harness):
 def test_shortcut_list_is_shown_in_panel(harness):
     h = harness()
     texts = {label.text() for label in h.window.side.findChildren(type(h.window.bg_name)) if label.text()}
-    for needle in ("배경 번호로 바로 전환", "이전 / 다음 배경", "빈 배경 촬영 (촬영 중에는 취소)",
+    for needle in ("배경 번호로 바로 전환", "빈 배경 촬영 (촬영 중에는 취소)",
                    "알파 매트 함께 보기", "전체 화면", "사용 안내"):
         assert needle in texts, needle
+    assert "이전 / 다음 배경" not in texts, "방향키 안내는 없어졌습니다"
+    caps = {label.text() for label in h.window.side.findChildren(type(h.window.bg_name))}
+    assert "Space" in caps and "B" not in caps and "←" not in caps
 
 
 # ---------------------------------------------------------------- 배경 번호
-def test_number_keys_and_arrows_switch_background(harness):
+def test_number_keys_switch_background_and_arrows_do_nothing(harness):
     h = harness()
     h.start_running()
     h.key(Qt.Key.Key_3)
     assert h.until(lambda: h.window._current_bg == 3)
     assert h.window.bus._buttons[2].property("current") is True
     assert h.window.bus._buttons[0].property("current") is False
-    h.key(Qt.Key.Key_Left)
-    assert h.until(lambda: h.window._current_bg == 2)
+    h.key(Qt.Key.Key_Left)  # 방향키는 더 이상 배경을 바꾸지 않음
     h.key(Qt.Key.Key_Right)
-    h.key(Qt.Key.Key_Right)  # 3 → 1 (순환)
+    pump(h.qapp, 150)
+    assert h.window._current_bg == 3
+    h.key(Qt.Key.Key_1)
     assert h.until(lambda: h.window._current_bg == 1)
     assert h.window.bg_name.text() == "01_bg.png"
     assert h.matters[0].bg_calls[-1].name == "01_bg.png"
@@ -219,17 +226,17 @@ def test_alpha_key_toggles_status_text(harness):
 
 
 # ---------------------------------------------------------------- 빈 배경 촬영
-def test_missing_bgr_guides_then_b_key_captures(harness):
+def test_missing_bgr_guides_then_space_key_captures(harness):
     h = harness(with_bgr=False)
     w = h.window
     w.start_pipeline()
     assert h.until(lambda: w._state == "waiting_bg")
     assert w.status_label.text() == "배경 촬영 필요"
-    assert w.banner.code == "bgr_missing" and "배경 촬영 (B)" in h.banner_buttons()
+    assert w.banner.code == "bgr_missing" and "배경 촬영 (스페이스)" in h.banner_buttons()
     assert w.preview._title == "", "배너가 같은 안내를 하는 동안 카드로 반복하면 안 됩니다"
     assert w.btn_capture.property("emphasis") is True and w.btn_toggle.property("demoted") is True
 
-    h.key(Qt.Key.Key_B)
+    h.key(Qt.Key.Key_Space)
     assert h.until(lambda: w._state == "capturing")
     assert w.banner.code is None, "촬영이 시작되면 이전 안내는 걷어야 합니다"
     assert w.btn_capture.text() == "촬영 취소"
@@ -245,7 +252,7 @@ def test_banner_capture_button_starts_capture(harness):
     h = harness(with_bgr=False)
     h.window.start_pipeline()
     assert h.until(lambda: h.window._state == "waiting_bg")
-    h.banner_buttons()["배경 촬영 (B)"].click()
+    h.banner_buttons()["배경 촬영 (스페이스)"].click()
     assert h.until(lambda: h.window._state == "capturing")
 
 
@@ -253,7 +260,7 @@ def test_escape_cancels_capture_without_closing(harness):
     h = harness()
     h.cfg.countdown_seconds = 10
     h.start_running()
-    h.key(Qt.Key.Key_B)
+    h.key(Qt.Key.Key_Space)
     assert h.until(lambda: h.window._state == "capturing")
     h.key(Qt.Key.Key_Escape)
     assert h.until(lambda: h.window._state == "running")
@@ -263,7 +270,7 @@ def test_escape_cancels_capture_without_closing(harness):
 
 def test_capture_button_not_available_before_camera_is_ready(harness):
     h = harness()
-    h.key(Qt.Key.Key_B)
+    h.key(Qt.Key.Key_Space)
     assert any("지금은 배경을 촬영할 수 없습니다" in t for t in h.history_titles())
     assert not h.window.btn_capture.isEnabled()
 
@@ -473,3 +480,47 @@ def test_history_is_capped_and_newest_first(harness):
         h.window._add_notice(messages.bg_invalid(i + 1, 3))
     assert h.window.history.count() == mw.HISTORY_LIMIT
     assert "70번" in h.history_titles()[0]
+
+
+# ---------------------------------------------------------------- 레이아웃 / 테마
+def test_control_buttons_sit_below_the_preview(harness):
+    h = harness()
+    w = h.window
+    w.show()
+    h.qapp.processEvents()
+    top = lambda widget: widget.mapTo(w, widget.rect().topLeft()).y()  # noqa: E731
+    assert top(w.btn_toggle) >= w.preview.mapTo(w, w.preview.rect().bottomLeft()).y()
+    assert top(w.btn_capture) == top(w.btn_toggle) == top(w.btn_settings)
+    assert not w.side.isAncestorOf(w.btn_toggle), "오른쪽 패널에는 더 이상 버튼이 없어야 합니다"
+
+
+def test_info_sections_use_smaller_text_than_the_background_section(harness):
+    h = harness()
+    w = h.window
+    w.show()
+    h.qapp.processEvents()
+    assert w.val_fps.font().pixelSize() in (-1, 11) or w.val_fps.fontInfo().pixelSize() <= 11
+    assert w.bg_name.fontInfo().pixelSize() > w.val_fps.fontInfo().pixelSize()
+
+
+def test_theme_switch_applies_saves_and_recolors(harness):
+    h = harness()
+    w = h.window
+    assert theme.current().name == "dark"
+    h.notices_before = w.history.count()
+    w._add_notice(messages.bg_invalid(7, 3))
+    saved = []
+    w._save = lambda cfg: saved.append(cfg.theme)
+    w._theme_buttons["light"].click()
+    assert theme.current().name == "light" and w.cfg.theme == "light" and saved == ["light"]
+    assert w._theme_buttons["light"].isChecked() and not w._theme_buttons["dark"].isChecked()
+    assert theme.current().CONSOLE in h.qapp.styleSheet()
+    key = w.history.item(0).data(Qt.ItemDataRole.UserRole)
+    assert w.history.item(0).foreground().color().name() == theme.color(key).lower()
+    w._theme_buttons["dark"].click()
+    assert theme.current().name == "dark" and saved == ["light", "dark"]
+
+
+def test_saved_theme_is_used_at_startup(harness):
+    h = harness(theme_name="light")
+    assert theme.current().name == "light" and h.window._theme_buttons["light"].isChecked()

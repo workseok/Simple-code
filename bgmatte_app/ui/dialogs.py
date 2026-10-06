@@ -36,13 +36,12 @@ INTRO_STEPS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
     ),
     (
         "빈 배경을 촬영합니다",
-        "피사체(사람·물체)가 화면 밖에 있는 상태에서 누르면, 카운트다운 뒤에 배경이 저장됩니다.",
-        ("B",),
+        "피사체(사람·물체)가 화면 밖에 있는 상태에서 스페이스바를 누르면, 카운트다운 뒤에 배경이 저장됩니다.",
+        ("Space",),
     ),
     (
         "합성 배경을 고릅니다",
-        "backgrounds 폴더의 이미지가 파일명 순서대로 1번, 2번… 이 됩니다. 숫자 키로 바로 바꾸거나 "
-        "방향 키로 넘겨 보세요.",
+        "backgrounds 폴더의 이미지가 파일명 순서대로 1번, 2번… 이 됩니다. 숫자 키(1~9)로 바로 바꿀 수 있습니다.",
         ("1", "–", "9"),
     ),
     (
@@ -150,10 +149,10 @@ class PathField(QWidget):
         ok = bool(path) and (path.is_dir() if self._kind == "dir" else path.is_file())
         if ok:
             self.status.setText("✓ 확인됨")
-            color = theme.LIVE
+            color = theme.color("LIVE")
         else:
             self.status.setText(f"✕ {self._missing_text}")
-            color = theme.WAIT
+            color = theme.color("WAIT")
         self.status.setStyleSheet(f"color: {color}; font-size: 12px;")
 
 
@@ -254,7 +253,7 @@ class SettingsDialog(QDialog):
         )
         form.addRow("합성 배경 폴더", self.backgrounds)
         self.bgr = PathField(
-            cfg.bgr, "file", "아직 없음 (B 키로 촬영하면 만들어집니다)", "빈 배경 이미지"
+            cfg.bgr, "file", "아직 없음 (스페이스바로 촬영하면 만들어집니다)", "빈 배경 이미지"
         )
         form.addRow("빈 배경 이미지", self.bgr)
         self.countdown = _choice_combo(

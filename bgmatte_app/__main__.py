@@ -46,12 +46,12 @@ def main() -> int:
 
     from .config import APP_NAME, load_config, log_path
     from .ui.main_window import MainWindow
-    from .ui.theme import STYLE
+    from .ui import theme
 
     _set_mac_app_name(APP_NAME)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(theme.build_style())
 
     shown = {"done": False}
 

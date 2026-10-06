@@ -127,7 +127,7 @@ def bgr_missing(path: Path) -> Notice:
     return Notice(
         "bgr_missing", Level.WARN, "먼저 빈 배경을 촬영해 주세요",
         f"저장된 배경 이미지({path.name})가 없습니다.",
-        "피사체(사람·물체)를 화면 밖으로 옮기고 B 키를 누르세요. 촬영한 뒤에는 카메라를 움직이지 마세요.",
+        "피사체(사람·물체)를 화면 밖으로 옮기고 스페이스바를 누르세요. 촬영한 뒤에는 카메라를 움직이지 마세요.",
         ("capture",),
         sticky=True,
     )
@@ -137,7 +137,7 @@ def bgr_unreadable(path: Path) -> Notice:
     return Notice(
         "bgr_unreadable", Level.WARN, "저장된 배경 이미지를 읽을 수 없습니다",
         f"{path.name} 파일이 손상됐거나 이미지가 아닙니다.",
-        "피사체를 화면 밖으로 옮기고 B 키로 다시 촬영해 주세요.",
+        "피사체를 화면 밖으로 옮기고 스페이스바로 다시 촬영해 주세요.",
         ("capture",),
         sticky=True,
     )
@@ -147,7 +147,7 @@ def bgr_size_mismatch(bgr_wh: Tuple[int, int], cam_wh: Tuple[int, int]) -> Notic
     return Notice(
         "bgr_size_mismatch", Level.WARN, "배경 이미지와 카메라 해상도가 다릅니다",
         f"배경 {bgr_wh[0]}×{bgr_wh[1]} / 현재 카메라 {cam_wh[0]}×{cam_wh[1]}",
-        "이대로도 동작하지만 합성 품질이 떨어질 수 있습니다. 같은 해상도에서 B 키로 다시 촬영하세요.",
+        "이대로도 동작하지만 합성 품질이 떨어질 수 있습니다. 같은 해상도에서 스페이스바로 다시 촬영하세요.",
         ("capture",),
     )
 
@@ -222,7 +222,7 @@ def bg_invalid(number: int, count: int) -> Notice:
 def bg_not_ready() -> Notice:
     return Notice(
         "bg_not_ready", Level.INFO, "배경 전환은 실행 중에만 할 수 있습니다",
-        "준비가 끝나면 숫자 키나 ← → 로 배경을 바꿀 수 있습니다.",
+        "준비가 끝나면 숫자 키(1~9)로 배경을 바꿀 수 있습니다.",
     )
 
 

@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QCloseEvent, QColor, QDesktopServices, QFontMetrics, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QDialog,
     QGridLayout,
     QHBoxLayout,
@@ -40,17 +41,17 @@ ACTION_LABELS = {
     "open_camera_privacy": "시스템 설정 열기",
     "open_backgrounds": "배경 폴더 열기",
     "restart": "다시 시작",
-    "capture": "배경 촬영 (B)",
+    "capture": "배경 촬영 (스페이스)",
 }
 
 STATE_VIEW = {
-    "idle": ("대기", theme.FAINT),
-    "starting": ("준비 중", theme.INFO),
-    "waiting_bg": ("배경 촬영 필요", theme.WAIT),
-    "running": ("실행 중", theme.LIVE),
-    "capturing": ("촬영 중", theme.STOP),
-    "stopped": ("정지됨", theme.FAINT),
-    "error": ("오류", theme.STOP),
+    "idle": ("대기", "FAINT"),
+    "starting": ("준비 중", "INFO"),
+    "waiting_bg": ("배경 촬영 필요", "WAIT"),
+    "running": ("실행 중", "LIVE"),
+    "capturing": ("촬영 중", "STOP"),
+    "stopped": ("정지됨", "FAINT"),
+    "error": ("오류", "STOP"),
 }
 
 STEP_HINT = (
@@ -61,17 +62,16 @@ STEP_HINT = (
 )
 
 LEVEL_COLOR = {
-    Level.INFO: theme.MUTED,
-    Level.SUCCESS: theme.LIVE,
-    Level.WARN: theme.WAIT,
-    Level.ERROR: theme.STOP,
+    Level.INFO: "MUTED",
+    Level.SUCCESS: "LIVE",
+    Level.WARN: "WAIT",
+    Level.ERROR: "STOP",
 }
 
 _PREFS_KEYS = ("⌘", ",") if sys.platform == "darwin" else ("Ctrl", ",")
 SHORTCUTS = (
     (("1", "–", "9"), "배경 번호로 바로 전환"),
-    (("←", "→"), "이전 / 다음 배경"),
-    (("B",), "빈 배경 촬영 (촬영 중에는 취소)"),
+    (("Space",), "빈 배경 촬영 (촬영 중에는 취소)"),
     (("A",), "알파 매트 함께 보기"),
     (("F",), "전체 화면"),
     (("H",), "사용 안내"),
@@ -192,7 +192,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.resize(1240, 820)
         self.setMinimumSize(1000, 660)
+        theme.set_theme(self.cfg.theme)
         self._build_ui()
+        self._apply_theme()
         self._install_shortcuts()
         self.permission_answered.connect(self._on_permission_answered)
         self._set_state("idle")
@@ -218,17 +220,37 @@ class MainWindow(QMainWindow):
         self.banner.action_requested.connect(self._on_action)
         self.banner.cleared.connect(self._refresh_overlay)
         self.preview = PreviewView()
-        self.footnote = QLabel("카메라는 빈 배경을 촬영한 뒤 움직이지 마세요.")
-        self.footnote.setObjectName("faint")
         left.addWidget(self.steps)
         left.addWidget(self.banner)
         left.addWidget(self.preview, 1)
-        left.addWidget(self.footnote)
+
+        # 미리보기 바로 아래: 시작/정지, 배경 촬영, 설정 버튼과 안내 한 줄
+        self.controls = QWidget()
+        self.controls.setObjectName("console")
+        bar = QHBoxLayout(self.controls)
+        bar.setContentsMargins(0, 0, 0, 0)
+        bar.setSpacing(8)
+        self.btn_toggle = QPushButton("시작")
+        self.btn_toggle.setObjectName("primary")
+        self.btn_capture = QPushButton("배경 촬영")
+        self.btn_settings = QPushButton("설정")
+        for b in (self.btn_toggle, self.btn_capture, self.btn_settings):
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 단축키(스페이스 등)가 버튼에 먹히지 않도록
+            b.setMinimumWidth(92)
+            bar.addWidget(b)
+        self.btn_toggle.clicked.connect(self.toggle_pipeline)
+        self.btn_capture.clicked.connect(self.toggle_capture)
+        self.btn_settings.clicked.connect(self.open_settings)
+        bar.addStretch(1)
+        self.footnote = QLabel("카메라는 빈 배경을 촬영한 뒤 움직이지 마세요.")
+        self.footnote.setObjectName("faint")
+        bar.addWidget(self.footnote)
+        left.addWidget(self.controls)
         root.addLayout(left, 1)
 
         # ---- 오른쪽: 콘솔
         self.side = QWidget()
-        self.side.setFixedWidth(372)
+        self.side.setFixedWidth(340)
         side = QVBoxLayout(self.side)
         side.setContentsMargins(0, 0, 0, 0)
         side.setSpacing(12)
@@ -239,25 +261,14 @@ class MainWindow(QMainWindow):
         title.setObjectName("appTitle")
         header.addWidget(title)
         header.addStretch(1)
+        header.addLayout(self._build_theme_switch())
+        header.addSpacing(6)
         self.tally = TallyDot()
         self.status_label = QLabel()
         header.addWidget(self.tally)
         header.addWidget(self.status_label)
         side.addLayout(header)
 
-        buttons = QHBoxLayout()
-        buttons.setSpacing(8)
-        self.btn_toggle = QPushButton("시작")
-        self.btn_toggle.setObjectName("primary")
-        self.btn_capture = QPushButton("배경 촬영")
-        self.btn_settings = QPushButton("설정")
-        for b in (self.btn_toggle, self.btn_capture, self.btn_settings):
-            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 단축키가 버튼에 먹히지 않도록
-            buttons.addWidget(b)
-        self.btn_toggle.clicked.connect(self.toggle_pipeline)
-        self.btn_capture.clicked.connect(self.toggle_capture)
-        self.btn_settings.clicked.connect(self.open_settings)
-        side.addLayout(buttons)
         side.addWidget(hairline())
 
         scroll = QScrollArea()
@@ -268,6 +279,7 @@ class MainWindow(QMainWindow):
         col = QVBoxLayout(body)
         col.setContentsMargins(0, 0, 8, 0)
         col.setSpacing(12)
+        body_col = col
 
         # 합성 배경
         row = QHBoxLayout()
@@ -296,13 +308,21 @@ class MainWindow(QMainWindow):
         col.addWidget(self.bg_note)
         col.addWidget(hairline())
 
+        # 아래 세 영역(상태 · 단축키 · 알림 기록)은 보조 정보라서 작은 글씨로 표시합니다.
+        compact = QWidget()
+        compact.setObjectName("compact")
+        col = QVBoxLayout(compact)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(8)
+        body_col.addWidget(compact)
+
         # 상태
         t = QLabel("상태")
         t.setObjectName("sectionTitle")
         col.addWidget(t)
         grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(6)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(3)
         self.val_device = QLabel("—")
         self.val_resolution = QLabel("—")
         self.val_fps = QLabel("—")
@@ -324,14 +344,14 @@ class MainWindow(QMainWindow):
         t.setObjectName("sectionTitle")
         col.addWidget(t)
         keys = QGridLayout()
-        keys.setHorizontalSpacing(14)
-        keys.setVerticalSpacing(6)
+        keys.setHorizontalSpacing(12)
+        keys.setVerticalSpacing(4)
         for r, (caps, text) in enumerate(SHORTCUTS):
-            keys.addWidget(keycaps(*caps), r, 0, Qt.AlignmentFlag.AlignVCenter)
+            keys.addWidget(keycaps(*caps, height=18), r, 0, Qt.AlignmentFlag.AlignVCenter)
             label = QLabel(text)
             label.setWordWrap(True)
             keys.addWidget(label, r, 1, Qt.AlignmentFlag.AlignVCenter)
-        keys.setColumnMinimumWidth(0, 92)
+        keys.setColumnMinimumWidth(0, 78)
         keys.setColumnStretch(1, 1)
         col.addLayout(keys)
         col.addWidget(hairline())
@@ -343,14 +363,59 @@ class MainWindow(QMainWindow):
         self.history = QListWidget()
         self.history.setObjectName("history")
         self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.history.setMinimumHeight(110)
+        self.history.setMinimumHeight(84)
         self.history.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         col.addWidget(self.history)
-        col.addStretch(1)
+        body_col.addStretch(1)
 
         scroll.setWidget(body)
         side.addWidget(scroll, 1)
         root.addWidget(self.side)
+
+    def _build_theme_switch(self) -> QHBoxLayout:
+        """헤더의 '어둡게 | 밝게' 선택 버튼."""
+        box = QHBoxLayout()
+        box.setSpacing(0)
+        self._theme_group = QButtonGroup(self)
+        self._theme_group.setExclusive(True)
+        self._theme_buttons = {}
+        for name, pos in (("dark", "left"), ("light", "right")):
+            button = QPushButton(theme.THEME_LABELS[name])
+            button.setObjectName("seg")
+            button.setProperty("pos", pos)
+            button.setCheckable(True)
+            button.setChecked(name == theme.current().name)
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            button.setToolTip("화면 색상을 바꿉니다")
+            button.clicked.connect(lambda _=False, n=name: self.set_theme(n))
+            self._theme_group.addButton(button)
+            self._theme_buttons[name] = button
+            box.addWidget(button)
+        return box
+
+    def set_theme(self, name: str) -> None:
+        """사용자가 테마를 고른 경우: 적용하고 다음 실행에도 쓰도록 저장합니다."""
+        if name not in theme.THEMES:
+            return
+        theme.set_theme(name)
+        self.cfg.theme = name
+        self._apply_theme()
+        self._persist()
+
+    def _apply_theme(self) -> None:
+        palette = theme.current()
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(theme.build_style(palette))
+        for name, button in self._theme_buttons.items():
+            button.setChecked(name == palette.name)
+        for i in range(self.history.count()):  # 이미 쌓인 알림 글자색도 새 테마에 맞춤
+            item = self.history.item(i)
+            key = item.data(Qt.ItemDataRole.UserRole)
+            if key:
+                item.setForeground(QColor(theme.color(key)))
+        self.tally.update()
+        self.preview.update()
 
     def _install_shortcuts(self) -> None:
         self._shortcuts: List[QShortcut] = []
@@ -363,9 +428,7 @@ class MainWindow(QMainWindow):
 
         for n in range(1, 10):
             add(str(n), lambda n=n: self.select_background(n))
-        add("Left", lambda: self.step_background(-1))
-        add("Right", lambda: self.step_background(+1))
-        add("B", self.toggle_capture)
+        add("Space", self.toggle_capture)
         add("A", self.toggle_alpha)
         add("F", self.toggle_fullscreen)
         add("H", self.show_intro)
@@ -483,12 +546,6 @@ class MainWindow(QMainWindow):
             return
         self._worker.select_background(number)
 
-    def step_background(self, delta: int) -> None:
-        if self._worker is None or self._state not in ("running", "capturing"):
-            self._add_notice(messages.bg_not_ready())
-            return
-        self._worker.step_background(delta)
-
     def toggle_alpha(self) -> None:
         if self._worker is not None and self._state in ("running", "capturing"):
             self._worker.toggle_alpha()
@@ -509,7 +566,7 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-        for w in (self.side, self.steps, self.footnote):
+        for w in (self.side, self.steps, self.controls):
             w.setVisible(not full)
         self._update_hud()
 
@@ -556,9 +613,9 @@ class MainWindow(QMainWindow):
     # ================================================================ 워커 이벤트 처리
     def _set_state(self, state: str) -> None:
         self._state = state
-        text, color = STATE_VIEW[state]
+        text, color_key = STATE_VIEW[state]
         self.status_label.setText(text)
-        self.tally.set_color(color)
+        self.tally.set_color(color_key)
         if state in ("idle", "starting", "stopped", "error"):
             self.preview.clear_frame()
             self.preview.set_countdown(None)
@@ -616,7 +673,7 @@ class MainWindow(QMainWindow):
             else:
                 self.preview.set_overlay(
                     "빈 배경을 촬영해 주세요",
-                    "피사체를 화면 밖으로 옮긴 뒤 B 키를 누르세요. 촬영한 뒤에는 카메라를 움직이지 마세요.",
+                    "피사체를 화면 밖으로 옮긴 뒤 스페이스바를 누르세요. 촬영한 뒤에는 카메라를 움직이지 마세요.",
                 )
         elif s == "stopped":
             self.preview.set_overlay("정지됨", "'시작' 버튼으로 다시 실행합니다.")
@@ -671,13 +728,14 @@ class MainWindow(QMainWindow):
         self.bg_name.setToolTip(name)
         notes = []
         if count > BusRow.SLOTS:
-            notes.append(f"{BusRow.SLOTS + 1}번부터는 ← → 키로 넘겨 주세요.")
+            notes.append(f"{BusRow.SLOTS}개까지만 선택할 수 있습니다. {BusRow.SLOTS + 1}번부터는 쓰이지 않습니다.")
         self.bg_note.setText(" ".join(notes))
         self.bg_note.setVisible(bool(notes))
 
     def _add_notice(self, notice: Notice) -> None:
         item = QListWidgetItem(f"{datetime.now():%H:%M:%S}   {notice.title}")
-        item.setForeground(QColor(LEVEL_COLOR[notice.level]))
+        item.setData(Qt.ItemDataRole.UserRole, LEVEL_COLOR[notice.level])
+        item.setForeground(QColor(theme.color(LEVEL_COLOR[notice.level])))
         tip = "\n".join(part for part in (notice.detail, notice.hint) if part)
         if tip:
             item.setToolTip(tip)
