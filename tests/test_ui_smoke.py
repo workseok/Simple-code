@@ -541,3 +541,50 @@ def test_preview_border_light_follows_state_and_icon_assets_exist(harness):
     assert w.preview._tally is None
     assert (ASSETS / "icon.png").is_file() and not app_icon().isNull()
     assert w.btn_toggle.property("running") is False
+
+
+# ---------------------------------------------------------------- 매팅 엔진 선택
+def test_settings_dialog_shows_only_the_rows_of_the_selected_engine(qapp):
+    dialog = SettingsDialog(Config(), camera_probe=lambda: [])
+    shown = lambda w: dialog._form.isRowVisible(w)  # noqa: E731
+    assert shown(dialog.bgr) and shown(dialog.repo) and not shown(dialog.modnet_repo) and not shown(dialog.rvm_repo)
+    dialog.engine.setCurrentIndex(dialog.engine.findData("modnet"))
+    assert not shown(dialog.bgr) and not shown(dialog.repo) and shown(dialog.modnet_repo) and not shown(dialog.rvm_repo)
+    dialog.engine.setCurrentIndex(dialog.engine.findData("rvm"))
+    assert not shown(dialog.modnet_repo) and shown(dialog.rvm_repo) and shown(dialog.rvm_ckpts["resnet50"])
+
+
+def test_settings_dialog_roundtrips_engine_options(qapp):
+    cfg = Config(engine="rvm", rvm_variant="resnet50", rvm_downsample=0.5, modnet_ref_size=384, modnet_smooth=0.3,
+                 modnet_checkpoint="m.ckpt", rvm_checkpoint="a.pth", rvm_checkpoint_resnet50="b.pth")
+    dialog = SettingsDialog(cfg, camera_probe=lambda: [])
+    out = dialog.result_config()
+    assert (out.engine, out.rvm_variant, out.rvm_downsample, out.modnet_ref_size, out.modnet_smooth) == (
+        "rvm", "resnet50", 0.5, 384, 0.3)
+    assert (out.modnet_checkpoint, out.rvm_checkpoint, out.rvm_checkpoint_resnet50) == ("m.ckpt", "a.pth", "b.pth")
+    dialog.engine.setCurrentIndex(dialog.engine.findData("modnet"))
+    dialog.modnet_size.setCurrentIndex(dialog.modnet_size.findData(512))
+    assert dialog.result_config().engine == "modnet" and dialog.result_config().modnet_ref_size == 512
+
+
+def test_engine_without_bgr_disables_capture_and_explains(harness):
+    h = harness(with_bgr=False)
+    h.window.cfg.engine = "rvm"
+    h.window._refresh_engine_view()
+    w = h.window
+    assert w.val_engine.text() == "RobustVideoMatting (mobilenetv3)"
+    assert "빈 배경 촬영 없이" in w.footnote.text()
+    h.start_running()
+    assert w._state == "running" and not w.btn_capture.isEnabled()
+    h.key(Qt.Key.Key_Space)
+    assert w._state == "running", "스페이스로도 촬영이 시작되면 안 됩니다"
+    assert any("빈 배경 촬영이 필요 없습니다" in t for t in h.history_titles())
+
+
+def test_default_engine_keeps_capture_button_and_footnote(harness):
+    h = harness()
+    w = h.window
+    assert w.val_engine.text() == "BackgroundMattingV2"
+    assert "빈 배경을 촬영한 뒤" in w.footnote.text()
+    h.start_running()
+    assert w.btn_capture.isEnabled()

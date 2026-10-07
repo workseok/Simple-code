@@ -22,6 +22,7 @@ import logging
 import math
 import queue
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -55,6 +56,9 @@ def _default_matter_factory(cfg: Config):
 
 
 def _default_camera_factory(index: int):
+    if sys.platform == "win32":
+        # 윈도우에서는 DirectShow가 해상도 지정과 시작 속도가 더 안정적입니다.
+        return cv2.VideoCapture(index, cv2.CAP_DSHOW)
     return cv2.VideoCapture(index)
 
 
@@ -157,13 +161,13 @@ class PipelineWorker(QThread):
     def _run_pipeline(self, cap) -> None:
         cfg = self._cfg
 
-        # 2) 배경 확인: 합성 배경 이미지 + 클린 배경(bgr)
+        # 2) 배경 확인: 합성 배경 이미지 (+ BackgroundMattingV2 엔진은 클린 배경(bgr)도 필요)
         self._step(STEP_BACKGROUND, "active")
         if not self._backgrounds:
             raise NoticeError(messages.bg_none(cfg.resolve(cfg.backgrounds_dir)))
         bgr_path = cfg.resolve(cfg.bgr)
-        bgr_wh = self._read_image_size(bgr_path)
-        if bgr_wh is None:
+        bgr_wh = self._read_image_size(bgr_path) if cfg.needs_bgr else None
+        if cfg.needs_bgr and bgr_wh is None:
             if bgr_path.exists():
                 self._notify(messages.bgr_unreadable(bgr_path))
             else:
@@ -184,7 +188,8 @@ class PipelineWorker(QThread):
         matter = self._matter_factory(cfg)
         label = matter.load()
         self.stream_info.emit(label, self._resolution)
-        matter.set_bgr(bgr_path)
+        if cfg.needs_bgr:
+            matter.set_bgr(bgr_path)
         self._select_first_loadable_background(matter)
         self._step(STEP_MODEL, "done")
         if self._stop.is_set():
@@ -314,6 +319,9 @@ class PipelineWorker(QThread):
                     continue  # 모델 준비 전에는 전환할 수 없음 (GUI가 먼저 안내)
                 self._handle_bg_command(matter, kind, cmd[1])
             elif kind == "capture":
+                if not self._cfg.needs_bgr:
+                    self._notify(messages.capture_not_needed(self._cfg.engine))
+                    continue
                 self._begin_capture()
             elif kind == "cancel":
                 if self._capture_end is not None:

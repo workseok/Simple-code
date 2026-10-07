@@ -154,6 +154,10 @@ def _all_notices():
         messages.repo_bad(p, ImportError("no model")),
         messages.checkpoint_missing(p),
         messages.checkpoint_mismatch("mattingrefine", "resnet50", "size mismatch"),
+        messages.engine_repo_missing("modnet", p),
+        messages.engine_checkpoint_missing("rvm", p),
+        messages.engine_load_failed("modnet", "size mismatch"),
+        messages.capture_not_needed("rvm"),
         messages.inference_failed("oops"),
         messages.cpu_fallback("mps oom"),
         messages.config_corrupt("bad json"),
@@ -243,3 +247,30 @@ def test_old_single_checkpoint_config_moves_to_its_backbone_slot(tmp_path):
     assert cfg.checkpoint_resnet101 == "models/pytorch_resnet101.pth"
     assert cfg.checkpoint == "models/pytorch_resnet50.pth"
     assert cfg.checkpoint_for() == "models/pytorch_resnet101.pth"
+
+
+def test_engine_defaults_and_validation():
+    cfg = Config()
+    assert cfg.engine == "bmv2" and cfg.needs_bgr
+    assert not Config(engine="modnet").needs_bgr and not Config(engine="rvm").needs_bgr
+    bad = Config(engine="nope", rvm_variant="x", modnet_ref_size=1, modnet_smooth=5, rvm_downsample=9).validated()
+    assert (bad.engine, bad.rvm_variant) == ("bmv2", "mobilenetv3")
+    assert (bad.modnet_ref_size, bad.modnet_smooth, bad.rvm_downsample) == (128, 0.9, 1.0)
+
+
+def test_rvm_checkpoint_is_chosen_per_variant():
+    cfg = Config(rvm_checkpoint="a.pth", rvm_checkpoint_resnet50="b.pth")
+    assert cfg.rvm_checkpoint_for("mobilenetv3") == "a.pth"
+    assert cfg.rvm_checkpoint_for("resnet50") == "b.pth"
+    assert Config(rvm_variant="resnet50", rvm_checkpoint_resnet50="b.pth").rvm_checkpoint_for() == "b.pth"
+
+
+def test_engine_settings_survive_roundtrip_and_old_config_defaults_to_bmv2(tmp_path):
+    path = tmp_path / "config.json"
+    save_config(Config(engine="rvm", rvm_variant="resnet50", modnet_ref_size=512, rvm_downsample=0.5), path)
+    loaded, warning = load_config(path)
+    assert warning is None
+    assert (loaded.engine, loaded.rvm_variant, loaded.modnet_ref_size, loaded.rvm_downsample) == ("rvm", "resnet50", 512, 0.5)
+    path.write_text('{"backbone": "resnet50", "camera_index": 2}', encoding="utf-8")  # 엔진 도입 전 설정 파일
+    old, _ = load_config(path)
+    assert old.engine == "bmv2" and old.camera_index == 2

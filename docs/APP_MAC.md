@@ -74,7 +74,8 @@ Intel Mac은 GPU 가속이 없어 CPU로 동작하므로 FPS가 낮을 수 있�
 | "Python을 찾을 수 없습니다" | conda 환경을 켜고 `build_app.sh` 재실행 |
 | 카메라 화면이 검음 | 위 3-2 권한 확인, 설정에서 카메라 번호 변경(캡처카드는 1 이상일 수 있음) |
 | 모델/체크포인트 오류 | 설정에서 `BackgroundMattingV2` 폴더와 `.pth` 경로 지정 (기본값은 `docs/SETUP_MAC.md` 구조 기준) |
-| 합성이 너무 느림 | 백본 낮추기, 카메라 해상도 낮추기 |
+| 합성이 너무 느림 | 백본 낮추기, 카메라 해상도 낮추기, 또는 설정의 매팅 엔진 변경(`docs/ENGINES.md`) |
+| 빈 배경 촬영 없이 쓰고 싶음 | 설정 → 매팅 엔진에서 MODNet 또는 RobustVideoMatting 선택 (`docs/ENGINES.md`, 설치: `bash packaging/install_engines.sh`) |
 | 설정을 초기화하고 싶음 | `~/Library/Application Support/BGMatte/config.json` 삭제 |
 
 ## 8. 대체 실행 방법

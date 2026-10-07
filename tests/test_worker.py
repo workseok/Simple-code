@@ -418,3 +418,32 @@ def test_frames_are_throttled_until_acked(env):
     worker.ack_frame()
     assert wait_for(lambda: len(delivered) == 2)
     stop(worker)
+
+
+# ---------------------------------------------------------------- 빈 배경이 필요 없는 엔진 (modnet / rvm)
+@pytest.mark.parametrize("engine", ["modnet", "rvm"])
+def test_engines_without_bgr_run_immediately_even_if_bgr_is_missing(env, engine):
+    _, cfg, folder, bgr = env
+    bgr.unlink()
+    cfg.engine = engine
+    worker, _, matter, rec = make_worker(cfg, folder)
+    worker.start()
+    assert wait_for(lambda: rec.has_state("running") and rec.frames >= 3)
+    assert not rec.has_state("waiting_bg"), "빈 배경 촬영을 기다리면 안 됩니다"
+    assert "bgr_missing" not in rec.codes()
+    assert matter.loaded and matter.bgr_calls == [], "bgr를 모델에 넘기지 않아야 합니다"
+    assert not bgr.exists()
+    stop(worker)
+
+
+def test_capture_command_is_declined_with_a_notice_when_engine_needs_no_bgr(env):
+    _, cfg, folder, bgr = env
+    bgr.unlink()
+    cfg.engine = "rvm"
+    worker, _, _, rec = make_worker(cfg, folder)
+    worker.start()
+    assert wait_for(lambda: rec.has_state("running"))
+    worker.start_capture()
+    assert wait_for(lambda: "capture_not_needed" in rec.codes())
+    assert not rec.has_state("capturing") and not bgr.exists()
+    stop(worker)

@@ -266,6 +266,49 @@ def checkpoint_missing(path: Path, backbone: str = "") -> Notice:
     )
 
 
+ENGINE_NAMES = {"bmv2": "BackgroundMattingV2", "modnet": "MODNet", "rvm": "RobustVideoMatting"}
+_ENGINE_HELP = {
+    "modnet": "MODNet 코드(github.com/ZHKKKe/MODNet)와 가중치(.ckpt)가 필요합니다. docs/ENGINES.md 의 설치 방법을 따라 주세요.",
+    "rvm": "RobustVideoMatting 코드(github.com/PeterL1n/RobustVideoMatting)와 가중치(.pth)가 필요합니다. docs/ENGINES.md 의 설치 방법을 따라 주세요.",
+}
+
+
+def engine_repo_missing(engine: str, path: Path) -> Notice:
+    name = ENGINE_NAMES.get(engine, engine)
+    return Notice(
+        "engine_repo_missing", Level.ERROR, f"{name} 코드 폴더를 찾을 수 없습니다", f"{path}",
+        _ENGINE_HELP.get(engine, "") + " 폴더를 옮겼다면 설정에서 위치를 바꿔 주세요.",
+        ("open_settings",),
+    )
+
+
+def engine_checkpoint_missing(engine: str, path: Path) -> Notice:
+    name = ENGINE_NAMES.get(engine, engine)
+    return Notice(
+        "engine_checkpoint_missing", Level.ERROR, f"{name} 가중치 파일이 없습니다", f"{path}",
+        _ENGINE_HELP.get(engine, "") + " 파일 위치가 다르면 설정에서 바꿔 주세요.",
+        ("open_settings",),
+    )
+
+
+def engine_load_failed(engine: str, err: object) -> Notice:
+    name = ENGINE_NAMES.get(engine, engine)
+    return Notice(
+        "engine_load_failed", Level.ERROR, f"{name} 모델을 불러오지 못했습니다", _short(err, 160),
+        "코드 폴더와 가중치 파일이 같은 엔진·같은 종류(RVM은 mobilenetv3/resnet50)인지 확인해 주세요.",
+        ("open_settings",),
+    )
+
+
+def capture_not_needed(engine: str) -> Notice:
+    name = ENGINE_NAMES.get(engine, engine)
+    return Notice(
+        "capture_not_needed", Level.INFO, "이 엔진은 빈 배경 촬영이 필요 없습니다",
+        f"{name}는 카메라 화면만으로 사람을 분리합니다. 빈 배경 촬영은 BackgroundMattingV2 엔진에서만 씁니다.",
+        banner=False,
+    )
+
+
 def checkpoint_mismatch(model_type: str, backbone: str, err: object) -> Notice:
     return Notice(
         "checkpoint_mismatch", Level.ERROR, "가중치와 모델 설정이 맞지 않습니다",

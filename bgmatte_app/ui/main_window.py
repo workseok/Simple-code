@@ -205,6 +205,7 @@ class MainWindow(QMainWindow):
         self.permission_answered.connect(self._on_permission_answered)
         self._set_state("idle")
         self._scan_backgrounds()
+        self._refresh_engine_view()
 
         if auto_start:
             QTimer.singleShot(0, self._startup)
@@ -336,13 +337,14 @@ class MainWindow(QMainWindow):
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(3)
+        self.val_engine = QLabel("—")
         self.val_device = QLabel("—")
         self.val_resolution = QLabel("—")
         self.val_fps = QLabel("—")
         self.val_fps.setObjectName("fpsValue")
         self.val_alpha = QLabel("꺼짐")
         for r, (name, value) in enumerate(
-            (("처리 장치", self.val_device), ("해상도", self.val_resolution),
+            (("엔진", self.val_engine), ("처리 장치", self.val_device), ("해상도", self.val_resolution),
              ("속도", self.val_fps), ("알파 보기", self.val_alpha))
         ):
             label = QLabel(name)
@@ -563,6 +565,8 @@ class MainWindow(QMainWindow):
             self._add_notice(messages.capture_unavailable())
         elif self._state == "capturing":
             self._worker.cancel_capture()
+        elif not self.cfg.needs_bgr:
+            self._add_notice(messages.capture_not_needed(self.cfg.engine))
         elif self._state in ("waiting_bg", "running"):
             self._worker.start_capture()
         else:
@@ -598,6 +602,7 @@ class MainWindow(QMainWindow):
             self.cfg = dialog.result_config()
             self._persist()
             self._scan_backgrounds()
+            self._refresh_engine_view()
         if was_active or accepted:
             self.start_pipeline()
 
@@ -605,7 +610,10 @@ class MainWindow(QMainWindow):
         if action == "open_settings":
             self.open_settings()
         elif action == "open_camera_privacy":
-            self._open_url(QUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"))
+            self._open_url(QUrl(
+                "ms-settings:privacy-webcam" if sys.platform == "win32"
+                else "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"
+            ))
         elif action == "open_backgrounds":
             folder = self.cfg.resolve(self.cfg.backgrounds_dir)
             try:
@@ -691,6 +699,18 @@ class MainWindow(QMainWindow):
         else:
             self.preview.clear_overlay()
 
+    def _refresh_engine_view(self) -> None:
+        """선택한 엔진 이름과, 엔진에 따라 달라지는 안내 문구(빈 배경 촬영 필요 여부)를 갱신합니다."""
+        name = messages.ENGINE_NAMES.get(self.cfg.engine, self.cfg.engine)
+        if self.cfg.engine == "rvm":
+            name += f" ({self.cfg.rvm_variant})"
+        self.val_engine.setText(name)
+        self.footnote.setText(
+            "카메라는 빈 배경을 촬영한 뒤 움직이지 마세요." if self.cfg.needs_bgr
+            else "이 엔진은 빈 배경 촬영 없이 바로 합성합니다."
+        )
+        self._refresh_buttons()
+
     def _refresh_buttons(self) -> None:
         active = self._worker is not None or self._awaiting_permission
         if self.btn_toggle.property("running") != active:
@@ -700,7 +720,9 @@ class MainWindow(QMainWindow):
             self.btn_toggle.setText("정지")
         else:
             self.btn_toggle.setText("다시 시작" if self._state == "error" else "시작")
-        can_capture = self._worker is not None and self._state in ("waiting_bg", "running", "capturing")
+        can_capture = (
+            self.cfg.needs_bgr and self._worker is not None and self._state in ("waiting_bg", "running", "capturing")
+        )
         self.btn_capture.setEnabled(can_capture)
         self.btn_capture.setText("촬영 취소" if self._state == "capturing" else "배경 촬영")
         need_capture = self._state == "waiting_bg"

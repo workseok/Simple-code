@@ -19,6 +19,9 @@ log = logging.getLogger(__name__)
 APP_NAME = "BG Matte"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# 매팅 엔진: bmv2 = BackgroundMattingV2(빈 배경 촬영 필요), modnet / rvm = 빈 배경 없이 사람만 분리
+ENGINES = ("bmv2", "modnet", "rvm")
+RVM_VARIANTS = ("mobilenetv3", "resnet50")
 MODEL_TYPES = ("mattingrefine", "mattingbase")
 BACKBONES = ("resnet50", "resnet101", "mobilenetv2")
 REFINE_MODES = ("full", "sampling", "thresholding")
@@ -46,6 +49,8 @@ def log_path() -> Path:
 
 @dataclass
 class Config:
+    # 엔진 선택 (아래 '모델' 설정은 bmv2, 그 아래 modnet/rvm 설정은 각 엔진용)
+    engine: str = "bmv2"
     # 모델
     repo_path: str = "../BackgroundMattingV2"
     # 백본마다 가중치 파일이 따로 필요합니다 (층 구조가 달라 서로 바꿔 쓸 수 없습니다).
@@ -59,6 +64,17 @@ class Config:
     refine_mode: str = "sampling"
     refine_sample_pixels: int = 80_000
     device: str = "auto"
+    # MODNet: 단일 프레임 인물 매팅. 처리 해상도(짧은 변)가 작을수록 빠르고, smooth는 깜빡임을 줄이는 시간축 스무딩(0=끔)
+    modnet_repo: str = "../MODNet"
+    modnet_checkpoint: str = "models/modnet_webcam_portrait_matting.ckpt"
+    modnet_ref_size: int = 256
+    modnet_smooth: float = 0.5
+    # RobustVideoMatting: 이전 프레임 상태를 이어받는 영상 매팅. downsample이 작을수록 빠름
+    rvm_repo: str = "../RobustVideoMatting"
+    rvm_variant: str = "mobilenetv3"
+    rvm_checkpoint: str = "models/rvm_mobilenetv3.pth"
+    rvm_checkpoint_resnet50: str = "models/rvm_resnet50.pth"
+    rvm_downsample: float = 0.375
     # 이미지
     bgr: str = "bgr.png"
     backgrounds_dir: str = "backgrounds"
@@ -86,6 +102,15 @@ class Config:
             "mobilenetv2": self.checkpoint_mobilenetv2,
         }.get(backbone, self.checkpoint)
 
+    def rvm_checkpoint_for(self, variant: Optional[str] = None) -> str:
+        variant = variant or self.rvm_variant
+        return self.rvm_checkpoint_resnet50 if variant == "resnet50" else self.rvm_checkpoint
+
+    @property
+    def needs_bgr(self) -> bool:
+        """빈 배경(bgr.png) 촬영이 필요한 엔진인지. modnet/rvm은 필요 없습니다."""
+        return self.engine == "bmv2"
+
     def validated(self) -> "Config":
         """타입/범위를 보정한 복사본을 반환합니다 (손으로 고친 config.json 방어)."""
         defaults = Config()
@@ -98,12 +123,17 @@ class Config:
             if values[name] not in choices:
                 values[name] = getattr(defaults, name)
 
+        pick("engine", ENGINES)
+        pick("rvm_variant", RVM_VARIANTS)
         pick("model_type", MODEL_TYPES)
         pick("backbone", BACKBONES)
         pick("refine_mode", REFINE_MODES)
         pick("device", DEVICES)
         pick("theme", THEMES)
 
+        values["modnet_ref_size"] = min(max(values["modnet_ref_size"], 128), 1024)
+        values["modnet_smooth"] = min(max(values["modnet_smooth"], 0.0), 0.9)
+        values["rvm_downsample"] = min(max(values["rvm_downsample"], 0.1), 1.0)
         values["backbone_scale"] = min(max(values["backbone_scale"], 0.1), 1.0)
         values["refine_sample_pixels"] = max(values["refine_sample_pixels"], 1_000)
         values["camera_index"] = min(max(values["camera_index"], 0), 20)
@@ -112,7 +142,8 @@ class Config:
         values["countdown_seconds"] = min(max(values["countdown_seconds"], 1), 30)
         values["average_frames"] = min(max(values["average_frames"], 1), 60)
         values["last_background"] = max(values["last_background"], 1)
-        for name in ("repo_path", "checkpoint", "checkpoint_resnet101", "checkpoint_mobilenetv2", "bgr", "backgrounds_dir", "legacy_background"):
+        for name in ("repo_path", "checkpoint", "checkpoint_resnet101", "checkpoint_mobilenetv2", "bgr", "backgrounds_dir", "legacy_background",
+                     "modnet_repo", "modnet_checkpoint", "rvm_repo", "rvm_checkpoint", "rvm_checkpoint_resnet50"):
             if not values[name].strip():
                 values[name] = getattr(defaults, name)
         return replace(self, **values)

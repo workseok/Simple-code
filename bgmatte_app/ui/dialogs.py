@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import BACKBONES, DEVICES, MODEL_TYPES, Config, resolve_path
+from ..config import BACKBONES, DEVICES, ENGINES, MODEL_TYPES, RVM_VARIANTS, Config, resolve_path
 from . import theme
 from .widgets import hairline, keycaps
 
@@ -169,6 +169,15 @@ def _choice_combo(options, current, custom_label) -> QComboBox:
     return combo
 
 
+ENGINE_CHOICES = (
+    ("BackgroundMattingV2 — 빈 배경 촬영 필요, 정밀", "bmv2"),
+    ("MODNet — 빈 배경 없이 인물만, 가벼움", "modnet"),
+    ("RobustVideoMatting — 빈 배경 없이 인물만, 영상용", "rvm"),
+)
+MODNET_SIZES = ((256, "256 (빠름)"), (384, "384"), (512, "512 (정밀)"), (768, "768 (매우 느림)"))
+MODNET_SMOOTH = (("꺼짐", 0.0), ("약", 0.3), ("보통", 0.5), ("강", 0.7))
+RVM_DOWNSAMPLE = (("0.25 (빠름)", 0.25), ("0.375 (720p 권장)", 0.375), ("0.5", 0.5), ("0.75 (정밀)", 0.75))
+
 RESOLUTIONS = (
     ("장치 기본값 (자동)", "0x0"),
     ("1280 × 720", "1280x720"),
@@ -247,6 +256,11 @@ class SettingsDialog(QDialog):
         )
         form.addRow("해상도", self.resolution)
 
+        # 매팅 엔진 (선택한 엔진에 해당하는 칸만 아래에 보입니다)
+        self.engine = _choice_combo(ENGINE_CHOICES, cfg.engine, lambda v: v)
+        form.addRow("매팅 엔진", self.engine)
+        self._engine_rows = {"bmv2": [], "modnet": [], "rvm": []}
+
         # 이미지
         self.backgrounds = PathField(
             cfg.backgrounds_dir, "dir", "폴더가 없습니다 (만들거나 다른 폴더를 지정하세요)", "합성 배경 폴더"
@@ -256,14 +270,17 @@ class SettingsDialog(QDialog):
             cfg.bgr, "file", "아직 없음 (스페이스바로 촬영하면 만들어집니다)", "빈 배경 이미지"
         )
         form.addRow("빈 배경 이미지", self.bgr)
+        self._engine_rows["bmv2"].append(self.bgr)
         self.countdown = _choice_combo(
             [(f"{n}초", n) for n in (3, 5, 8, 10, 15)], cfg.countdown_seconds, lambda v: f"{v}초"
         )
         form.addRow("촬영 카운트다운", self.countdown)
+        self._engine_rows["bmv2"].append(self.countdown)
 
         # 모델
         self.repo = PathField(cfg.repo_path, "dir", "폴더를 찾을 수 없습니다", "BackgroundMattingV2 폴더")
         form.addRow("BackgroundMattingV2", self.repo)
+        self._engine_rows["bmv2"].append(self.repo)
         # 백본마다 가중치 파일이 따로 필요합니다. 아래 '백본'에서 고른 칸이 실제로 쓰입니다.
         self.checkpoints = {}
         for bb, value in (
@@ -274,6 +291,7 @@ class SettingsDialog(QDialog):
             field = PathField(value, "file", "파일 없음 (이 백본을 쓸 때만 필요합니다)", f"{bb} 가중치(.pth)")
             self.checkpoints[bb] = field
             form.addRow(f"가중치 · {bb}", field)
+            self._engine_rows["bmv2"].append(field)
         self.backbone = QComboBox()
         self.backbone.addItems(BACKBONES)
         self.backbone.setCurrentText(cfg.backbone)
@@ -290,7 +308,64 @@ class SettingsDialog(QDialog):
             combos.addWidget(label)
             combos.addWidget(combo)
         combos.addStretch(1)
-        form.addRow("모델 옵션", combos)
+        combos_box = QWidget()
+        combos_box.setLayout(combos)
+        combos.setContentsMargins(0, 0, 0, 0)
+        form.addRow("모델 옵션", combos_box)
+        self._engine_rows["bmv2"].append(combos_box)
+
+        # MODNet
+        self.modnet_repo = PathField(cfg.modnet_repo, "dir", "폴더를 찾을 수 없습니다", "MODNet 폴더")
+        form.addRow("MODNet 코드 폴더", self.modnet_repo)
+        self.modnet_ckpt = PathField(cfg.modnet_checkpoint, "file", "파일 없음", "MODNet 가중치(.ckpt)")
+        form.addRow("MODNet 가중치", self.modnet_ckpt)
+        self.modnet_size = _choice_combo(
+            [(label, v) for v, label in MODNET_SIZES], cfg.modnet_ref_size, lambda v: f"{v} (현재 설정)"
+        )
+        self.modnet_smooth = _choice_combo(
+            [(label, v) for label, v in MODNET_SMOOTH], cfg.modnet_smooth, lambda v: f"{v:g} (현재 설정)"
+        )
+        modnet_opts = QWidget()
+        mo = QHBoxLayout(modnet_opts)
+        mo.setContentsMargins(0, 0, 0, 0)
+        for caption, combo in (("처리 해상도", self.modnet_size), ("깜빡임 줄이기", self.modnet_smooth)):
+            label = QLabel(caption)
+            label.setObjectName("muted")
+            mo.addWidget(label)
+            mo.addWidget(combo)
+        mo.addStretch(1)
+        form.addRow("MODNet 옵션", modnet_opts)
+        self._engine_rows["modnet"] += [self.modnet_repo, self.modnet_ckpt, modnet_opts]
+
+        # RobustVideoMatting
+        self.rvm_repo = PathField(cfg.rvm_repo, "dir", "폴더를 찾을 수 없습니다", "RobustVideoMatting 폴더")
+        form.addRow("RVM 코드 폴더", self.rvm_repo)
+        self.rvm_ckpts = {}
+        for variant, value in (("mobilenetv3", cfg.rvm_checkpoint), ("resnet50", cfg.rvm_checkpoint_resnet50)):
+            field = PathField(value, "file", "파일 없음 (이 종류를 쓸 때만 필요합니다)", f"RVM {variant} 가중치(.pth)")
+            self.rvm_ckpts[variant] = field
+            form.addRow(f"RVM 가중치 · {variant}", field)
+            self._engine_rows["rvm"].append(field)
+        self.rvm_variant = QComboBox()
+        self.rvm_variant.addItems(RVM_VARIANTS)
+        self.rvm_variant.setCurrentText(cfg.rvm_variant)
+        self.rvm_ds = _choice_combo(
+            [(label, v) for label, v in RVM_DOWNSAMPLE], cfg.rvm_downsample, lambda v: f"{v:g} (현재 설정)"
+        )
+        rvm_opts = QWidget()
+        ro = QHBoxLayout(rvm_opts)
+        ro.setContentsMargins(0, 0, 0, 0)
+        for caption, combo in (("종류", self.rvm_variant), ("처리 비율", self.rvm_ds)):
+            label = QLabel(caption)
+            label.setObjectName("muted")
+            ro.addWidget(label)
+            ro.addWidget(combo)
+        ro.addStretch(1)
+        form.addRow("RVM 옵션", rvm_opts)
+        self._engine_rows["rvm"] += [self.rvm_repo, rvm_opts]
+        self._form = form
+        self.engine.currentIndexChanged.connect(self._apply_engine_visibility)
+        self._apply_engine_visibility()
         root.addLayout(form)
 
         note = QLabel("저장하면 실행 중인 합성이 다시 시작됩니다. 상대 경로는 저장소 폴더 기준입니다.")
@@ -305,6 +380,14 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
+
+    def _apply_engine_visibility(self) -> None:
+        """고른 엔진에 해당하는 칸만 보이게 합니다."""
+        current = self.engine.currentData()
+        for engine, widgets in self._engine_rows.items():
+            for widget in widgets:
+                self._form.setRowVisible(widget, engine == current)
+        self.adjustSize()
 
     def _find_cameras(self) -> None:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -324,6 +407,16 @@ class SettingsDialog(QDialog):
     def result_config(self) -> Config:
         return replace(
             self._cfg,
+            engine=self.engine.currentData(),
+            modnet_repo=self.modnet_repo.text(),
+            modnet_checkpoint=self.modnet_ckpt.text(),
+            modnet_ref_size=int(self.modnet_size.currentData()),
+            modnet_smooth=float(self.modnet_smooth.currentData()),
+            rvm_repo=self.rvm_repo.text(),
+            rvm_variant=self.rvm_variant.currentText(),
+            rvm_checkpoint=self.rvm_ckpts["mobilenetv3"].text(),
+            rvm_checkpoint_resnet50=self.rvm_ckpts["resnet50"].text(),
+            rvm_downsample=float(self.rvm_ds.currentData()),
             camera_index=int(self.camera_index.currentData()),
             camera_width=int(self.resolution.currentData().split("x")[0]),
             camera_height=int(self.resolution.currentData().split("x")[1]),
