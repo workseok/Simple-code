@@ -4,7 +4,7 @@
   1. PyTorch 설치: NVIDIA GPU가 있으면 CUDA 빌드를 시도하고, 안 되면 CPU 빌드로 내려갑니다.
   2. 앱 라이브러리 설치 (requirements.txt, requirements-app.txt)
   3. 매팅 엔진 코드 3종을 프로젝트 폴더 '옆'에 내려받기 (git 불필요, zip으로 받음)
-       ../BackgroundMattingV2  ../MODNet  ../RobustVideoMatting
+       ../BackgroundMattingV2  ../RobustVideoMatting
   4. 가중치 내려받기 (파일 크기로 검증): models/ 아래
   5. 바탕화면 바로가기 만들기, 셀프체크 실행
 
@@ -33,7 +33,6 @@ CUDA_TAGS = ("cu128", "cu126", "cu124", "cu121")  # 최신 → 오래된 순으�
 
 REPOS = {
     "BackgroundMattingV2": "https://github.com/PeterL1n/BackgroundMattingV2/archive/refs/heads/master.zip",
-    "MODNet": "https://github.com/ZHKKKe/MODNet/archive/refs/heads/master.zip",
     "RobustVideoMatting": "https://github.com/PeterL1n/RobustVideoMatting/archive/refs/heads/master.zip",
 }
 
@@ -48,8 +47,6 @@ WEIGHTS: Tuple[Tuple[str, str, int, bool], ...] = (
     ("pytorch_mobilenetv2.pth", BMV2 + "pytorch_mobilenetv2.pth", 20_307_935, False),
     ("rvm_resnet50.pth", RVM + "rvm_resnet50.pth", 107_905_875, False),
 )
-MODNET_CKPT = ("modnet_webcam_portrait_matting.ckpt", 26_255_603)
-MODNET_FOLDER = "https://drive.google.com/drive/folders/1umYmlCulvIFNaqPjwod1SayFmSRHziyR"
 
 
 def say(text: str = "") -> None:
@@ -133,7 +130,7 @@ def fetch_repo(name: str, url: str, parent: Path) -> bool:
 
 
 def extract_single_root(archive: Path, dest: Path) -> None:
-    """zip 안에 최상위 폴더 하나(예: MODNet-master)가 있으면 그 안의 내용을 dest로 옮깁니다."""
+    """zip 안에 최상위 폴더 하나(예: RobustVideoMatting-master)가 있으면 그 안의 내용을 dest로 옮깁니다."""
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(archive) as zf:
             zf.extractall(tmp)
@@ -195,29 +192,6 @@ def install_torch(force_cpu: bool) -> None:
 
 
 # ------------------------------------------------------------------ 나머지 단계
-def install_modnet_weights(models: Path) -> bool:
-    name, size = MODNET_CKPT
-    target = models / name
-    if file_ok(target, size):
-        say(f"  ✓ 이미 있음: {name}")
-        return True
-    pip("install", "gdown", check=False)
-    tmp = models / "_modnet_tmp"
-    shutil.rmtree(tmp, ignore_errors=True)
-    rc = subprocess.run([sys.executable, "-m", "gdown", "--folder", MODNET_FOLDER, "-O", str(tmp)]).returncode
-    found = next(tmp.rglob(name), None) if tmp.exists() else None
-    ok = rc == 0 and found is not None and found.stat().st_size == size
-    if ok:
-        shutil.move(str(found), str(target))
-        say(f"  ✓ 받음: {name}")
-    else:
-        say("  ✕ MODNet 가중치를 받지 못했습니다. 브라우저로 아래 폴더를 열어")
-        say(f"      {MODNET_FOLDER}")
-        say(f"    {name} 을 받아 models 폴더에 넣어 주세요.")
-    shutil.rmtree(tmp, ignore_errors=True)
-    return ok
-
-
 def make_shortcut() -> None:
     """바탕화면에 'BG Matte' 바로가기를 만듭니다 (실패해도 설치는 계속)."""
     bat = ROOT / "packaging" / "BGMatte.bat"
@@ -275,8 +249,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if default or args.all_weights:
             if not download(url, models / name, size):
                 problems.append(name)
-    if not install_modnet_weights(models):
-        problems.append(MODNET_CKPT[0])
 
     say("\n[5/5] 마무리")
     write_python_path()

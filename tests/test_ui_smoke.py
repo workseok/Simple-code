@@ -548,24 +548,25 @@ def test_preview_border_light_follows_state_and_icon_assets_exist(harness):
 def test_settings_dialog_shows_only_the_rows_of_the_selected_engine(qapp):
     dialog = SettingsDialog(Config(), camera_probe=lambda: [])
     shown = lambda w: dialog._form.isRowVisible(w)  # noqa: E731
-    assert shown(dialog.bgr) and shown(dialog.repo) and not shown(dialog.modnet_repo) and not shown(dialog.rvm_repo)
-    dialog.engine.setCurrentIndex(dialog.engine.findData("modnet"))
-    assert not shown(dialog.bgr) and not shown(dialog.repo) and shown(dialog.modnet_repo) and not shown(dialog.rvm_repo)
+    assert shown(dialog.bgr) and shown(dialog.repo) and not shown(dialog.rvm_repo)
     dialog.engine.setCurrentIndex(dialog.engine.findData("rvm"))
-    assert not shown(dialog.modnet_repo) and shown(dialog.rvm_repo) and shown(dialog.rvm_ckpts["resnet50"])
+    assert not shown(dialog.bgr) and not shown(dialog.repo) and shown(dialog.rvm_repo) and shown(dialog.rvm_ckpts["resnet50"])
+
+
+def test_engine_choices_no_longer_offer_modnet(qapp):
+    dialog = SettingsDialog(Config(), camera_probe=lambda: [])
+    assert [dialog.engine.itemData(i) for i in range(dialog.engine.count())] == ["bmv2", "rvm"]
 
 
 def test_settings_dialog_roundtrips_engine_options(qapp):
-    cfg = Config(engine="rvm", rvm_variant="resnet50", rvm_downsample=0.5, modnet_ref_size=384, modnet_smooth=0.3,
-                 modnet_checkpoint="m.ckpt", rvm_checkpoint="a.pth", rvm_checkpoint_resnet50="b.pth")
+    cfg = Config(engine="rvm", rvm_variant="resnet50", rvm_downsample=0.5,
+                 rvm_checkpoint="a.pth", rvm_checkpoint_resnet50="b.pth")
     dialog = SettingsDialog(cfg, camera_probe=lambda: [])
     out = dialog.result_config()
-    assert (out.engine, out.rvm_variant, out.rvm_downsample, out.modnet_ref_size, out.modnet_smooth) == (
-        "rvm", "resnet50", 0.5, 384, 0.3)
-    assert (out.modnet_checkpoint, out.rvm_checkpoint, out.rvm_checkpoint_resnet50) == ("m.ckpt", "a.pth", "b.pth")
-    dialog.engine.setCurrentIndex(dialog.engine.findData("modnet"))
-    dialog.modnet_size.setCurrentIndex(dialog.modnet_size.findData(512))
-    assert dialog.result_config().engine == "modnet" and dialog.result_config().modnet_ref_size == 512
+    assert (out.engine, out.rvm_variant, out.rvm_downsample) == ("rvm", "resnet50", 0.5)
+    assert (out.rvm_checkpoint, out.rvm_checkpoint_resnet50) == ("a.pth", "b.pth")
+    dialog.engine.setCurrentIndex(dialog.engine.findData("bmv2"))
+    assert dialog.result_config().engine == "bmv2"
 
 
 def test_engine_without_bgr_disables_capture_and_explains(harness):

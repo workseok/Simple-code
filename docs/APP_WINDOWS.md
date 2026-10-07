@@ -1,6 +1,6 @@
 # BG Matte 윈도우 설치·사용 가이드
 
-맥에서 쓰던 앱(BackgroundMattingV2 · MODNet · RobustVideoMatting 3엔진, 번호 배경 합성, 알파 보기 등)을
+맥에서 쓰던 앱(BackgroundMattingV2 · RobustVideoMatting 2엔진, 번호 배경 합성, 알파 보기 등)을
 **윈도우에서 그대로** 쓰기 위한 가이드입니다. 명령어를 직접 입력할 필요 없이 파일 두 개만 더블클릭하면 됩니다.
 
 > 이 윈도우 설치기는 맥 환경에서 만들어졌고 **실제 윈도우 PC에서는 아직 실행해 보지 않았습니다.**
@@ -21,7 +21,7 @@
 3. 검은 창에서 글자가 올라가는 동안 기다립니다 (10~30분). 자동으로 하는 일:
    - 전용 파이썬 환경 `bgmatte` 만들기, PyTorch 설치 (NVIDIA GPU가 있으면 GPU용을 먼저 시도)
    - 앱 라이브러리 설치
-   - 엔진 코드 3종을 프로젝트 폴더 **옆**에 받기 (`..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting`)
+   - 엔진 코드 2종을 프로젝트 폴더 **옆**에 받기 (`..\BackgroundMattingV2`, `..\RobustVideoMatting`)
    - 가중치를 `models` 폴더에 받기 (파일 크기까지 검사)
    - 바탕화면에 **BG Matte** 바로가기 만들기, 셀프체크 실행
 4. 마지막에 "설치가 끝났습니다"가 나오면 완료입니다.
@@ -46,13 +46,12 @@
 1. 합성 배경 이미지를 **`backgrounds` 폴더**에 넣습니다 (`01_스튜디오.png`처럼 번호로 시작하는 파일 이름, 한글도 됩니다).
 2. 앱 오른쪽 위 **설정**을 열어 카메라 번호와 해상도를 고릅니다. **카메라 찾기** 버튼이 열리는 번호를 알려 줍니다.
 3. **매팅 엔진**을 고릅니다 (아래 표). 처음에는 BackgroundMattingV2가 선택되어 있습니다.
-4. BackgroundMattingV2는 빈 배경을 먼저 촬영해야 합니다 (스페이스바, 촬영 뒤 카메라 고정). MODNet/RVM은 필요 없습니다.
+4. BackgroundMattingV2는 빈 배경을 먼저 촬영해야 합니다 (스페이스바, 촬영 뒤 카메라 고정). RVM은 필요 없습니다.
 5. 숫자 키 `1`~`9`로 배경 전환, `A` 알파 보기, `F` 전체 화면, `Ctrl + ,` 설정. (엔진 비교와 튜닝은 `docs/ENGINES.md`)
 
 | 엔진 | 윈도우에서의 특징 |
 | --- | --- |
 | BackgroundMattingV2 | 빈 배경 촬영 필요. 의자·소품도 분리. NVIDIA GPU가 있으면 실시간에 가까워질 가능성이 높음 (실측 필요) |
-| MODNet | 빈 배경 불필요, 사람만. 가벼움 |
 | RobustVideoMatting | 빈 배경 불필요, 사람만. 영상용. GPL-3.0 (제품 배포 시 라이선스 검토 필요) |
 
 ## 3. 카메라·캡처카드 팁
@@ -71,7 +70,7 @@
 | 설정 파일 | `%APPDATA%\BGMatte\config.json` |
 | 로그 | `%LOCALAPPDATA%\BGMatte\app.log` |
 | 가중치 | `<프로젝트>\models\` |
-| 엔진 코드 | `<프로젝트>\..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting` |
+| 엔진 코드 | `<프로젝트>\..\BackgroundMattingV2`, `..\RobustVideoMatting` |
 | 합성 배경 / 빈 배경 | `<프로젝트>\backgrounds\`, `<프로젝트>\bgr.png` |
 
 맥에서 쓰던 설정은 이어지지 않습니다. 경로 형식이 다르기 때문에 윈도우에서 새로 정하세요.
@@ -82,7 +81,7 @@
 | --- | --- |
 | 설치 중 `Miniforge를 찾지 못했습니다` | 창에 나온 주소에서 Miniforge3-Windows-x86_64.exe를 받아 설치한 뒤 `install_windows.bat` 재실행 |
 | 사용자 폴더 이름에 한글이 있어 설치 도중 오류 | Miniforge를 `C:\miniforge3` 에 설치하고 `install_windows.bat` 재실행 (이 경로를 먼저 찾습니다) |
-| 코드/가중치 받기 `✕` | 인터넷·회사 방화벽 확인 후 `install_windows.bat` 재실행 (zip이 막히면 git으로 대신 시도합니다). MODNet 가중치는 구글 드라이브라 막힐 수 있으며, 그 경우 안내된 주소에서 직접 받아 `models` 폴더에 넣으세요 |
+| 코드/가중치 받기 `✕` | 인터넷·회사 방화벽 확인 후 `install_windows.bat` 재실행 (zip이 막히면 git으로 대신 시도합니다). |
 | GPU가 있는데 CPU로 돈다고 나옴 | 최신 NVIDIA 드라이버를 설치한 뒤 `install_windows.bat`을 옵션 없이 다시 실행. 확인: 앱 상태 패널 '처리 장치'가 `CUDA`인지 |
 | 앱이 바로 닫힘 | 검은 창의 메시지와 로그 파일 확인 |
 | 한글 폴더/파일 이름 | 배경 이미지와 프로젝트 폴더에 한글이 있어도 읽고 저장되도록 처리했습니다 |
@@ -92,7 +91,7 @@
 ## 6. 업데이트·삭제
 
 - 업데이트: 새 zip의 파일을 같은 폴더에 덮어쓴 뒤, 필요하면 `install_windows.bat`을 다시 실행합니다 (이미 받은 것은 건너뜁니다).
-- 삭제: 프로젝트 폴더, `..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting`, 바탕화면 바로가기,
+- 삭제: 프로젝트 폴더, `..\BackgroundMattingV2`, `..\RobustVideoMatting`, 바탕화면 바로가기,
   conda 환경(`conda env remove -n bgmatte`)을 지우면 됩니다.
 
 ## 7. 구조 (개발자용)

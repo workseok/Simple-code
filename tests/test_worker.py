@@ -420,8 +420,8 @@ def test_frames_are_throttled_until_acked(env):
     stop(worker)
 
 
-# ---------------------------------------------------------------- 빈 배경이 필요 없는 엔진 (modnet / rvm)
-@pytest.mark.parametrize("engine", ["modnet", "rvm"])
+# ---------------------------------------------------------------- 빈 배경이 필요 없는 엔진 (rvm)
+@pytest.mark.parametrize("engine", ["rvm"])
 def test_engines_without_bgr_run_immediately_even_if_bgr_is_missing(env, engine):
     _, cfg, folder, bgr = env
     bgr.unlink()

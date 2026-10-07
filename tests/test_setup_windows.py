@@ -42,10 +42,10 @@ def test_download_failure_returns_false(tmp_path):
 
 
 def test_repo_zip_with_single_top_folder_is_unwrapped(tmp_path):
-    archive = make_zip(tmp_path / "r.zip", {"MODNet-master/src/models/modnet.py": "x", "MODNet-master/README.md": "r"})
-    sw.extract_single_root(archive, tmp_path / "MODNet")
-    assert (tmp_path / "MODNet" / "src" / "models" / "modnet.py").is_file()
-    assert not (tmp_path / "MODNet" / "MODNet-master").exists()
+    archive = make_zip(tmp_path / "r.zip", {"RobustVideoMatting-master/model/model.py": "x", "RobustVideoMatting-master/README.md": "r"})
+    sw.extract_single_root(archive, tmp_path / "RobustVideoMatting")
+    assert (tmp_path / "RobustVideoMatting" / "model" / "model.py").is_file()
+    assert not (tmp_path / "RobustVideoMatting" / "RobustVideoMatting-master").exists()
 
 
 def test_fetch_repo_is_idempotent(tmp_path):
@@ -66,12 +66,12 @@ def test_torch_plan_tries_cuda_tags_then_falls_back_to_cpu():
 def test_weight_table_matches_app_default_paths():
     from bgmatte_app.config import Config
 
-    names = {name for name, *_ in sw.WEIGHTS} | {sw.MODNET_CKPT[0]}
+    names = {name for name, *_ in sw.WEIGHTS}
     cfg = Config()
     for configured in (cfg.checkpoint, cfg.checkpoint_resnet101, cfg.checkpoint_mobilenetv2,
-                       cfg.modnet_checkpoint, cfg.rvm_checkpoint, cfg.rvm_checkpoint_resnet50):
+                       cfg.rvm_checkpoint, cfg.rvm_checkpoint_resnet50):
         assert Path(configured).name in names, f"설치 도우미가 받지 않는 기본 가중치: {configured}"
-    for configured in (cfg.repo_path, cfg.modnet_repo, cfg.rvm_repo):
+    for configured in (cfg.repo_path, cfg.rvm_repo):
         assert Path(configured).name in sw.REPOS, f"설치 도우미가 받지 않는 기본 저장소: {configured}"
 
 

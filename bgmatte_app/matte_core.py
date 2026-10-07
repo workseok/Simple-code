@@ -152,27 +152,6 @@ def _load_bmv2(cfg: Config, device: torch.device):
     return key, model
 
 
-def _load_modnet(cfg: Config, device: torch.device):
-    repo = cfg.resolve(cfg.modnet_repo)
-    ckpt = cfg.resolve(cfg.modnet_checkpoint)
-    _check_files(cfg, "modnet", repo, ckpt)
-    key = ("modnet", str(repo), str(ckpt), device.type)
-    if key in _MODEL_CACHE:
-        return key, _MODEL_CACHE[key]
-    try:
-        with _isolated_import(repo, ("src",)):
-            from src.models.modnet import MODNet  # type: ignore  # noqa: E402
-        model = MODNet(backbone_pretrained=False)
-        state = torch.load(str(ckpt), map_location="cpu")
-        # 공식 가중치는 DataParallel로 저장되어 키 앞에 'module.'이 붙어 있습니다.
-        model.load_state_dict({k.replace("module.", "", 1): v for k, v in state.items()})
-    except Exception as exc:
-        raise NoticeError(messages.engine_load_failed("modnet", exc)) from exc
-    model = model.to(device).eval()
-    _MODEL_CACHE[key] = model
-    return key, model
-
-
 def _load_rvm(cfg: Config, device: torch.device):
     repo = cfg.resolve(cfg.rvm_repo)
     ckpt = cfg.resolve(cfg.rvm_checkpoint_for())
@@ -221,34 +200,6 @@ class _BMV2Engine:
         self._bgr = self._bgr.to(device) if self._bgr is not None else None
 
 
-class _MODNetEngine:
-    name = "modnet"
-    needs_bgr = False
-
-    def __init__(self, cfg: Config, model):
-        self.cfg, self.model, self._prev = cfg, model, None
-
-    def infer(self, src):
-        h, w = src.shape[-2:]
-        scale = self.cfg.modnet_ref_size / min(h, w)
-        nh = max(32, int(round(h * scale / 32)) * 32)  # MODNet은 가로·세로가 32의 배수여야 합니다
-        nw = max(32, int(round(w * scale / 32)) * 32)
-        x = torch.nn.functional.interpolate(src, size=(nh, nw), mode="area" if scale < 1 else "bilinear",
-                                            **({} if scale < 1 else {"align_corners": False}))
-        x = (x - 0.5) / 0.5
-        _, _, matte = self.model(x, True)
-        smooth = self.cfg.modnet_smooth
-        if smooth > 0 and self._prev is not None and self._prev.shape == matte.shape:
-            matte = smooth * self._prev + (1 - smooth) * matte
-        self._prev = matte
-        pha = torch.nn.functional.interpolate(matte, size=(h, w), mode="bilinear", align_corners=False)
-        return pha.clamp(0, 1), None
-
-    def to(self, device) -> None:
-        self.model = self.model.to(device)
-        self._prev = None
-
-
 class _RVMEngine:
     name = "rvm"
     needs_bgr = False
@@ -270,7 +221,6 @@ class _RVMEngine:
 
 _LOADERS = {
     "bmv2": (_load_bmv2, _BMV2Engine),
-    "modnet": (_load_modnet, _MODNetEngine),
     "rvm": (_load_rvm, _RVMEngine),
 }
 

@@ -154,9 +154,9 @@ def _all_notices():
         messages.repo_bad(p, ImportError("no model")),
         messages.checkpoint_missing(p),
         messages.checkpoint_mismatch("mattingrefine", "resnet50", "size mismatch"),
-        messages.engine_repo_missing("modnet", p),
+        messages.engine_repo_missing("rvm", p),
         messages.engine_checkpoint_missing("rvm", p),
-        messages.engine_load_failed("modnet", "size mismatch"),
+        messages.engine_load_failed("rvm", "size mismatch"),
         messages.capture_not_needed("rvm"),
         messages.inference_failed("oops"),
         messages.cpu_fallback("mps oom"),
@@ -252,10 +252,10 @@ def test_old_single_checkpoint_config_moves_to_its_backbone_slot(tmp_path):
 def test_engine_defaults_and_validation():
     cfg = Config()
     assert cfg.engine == "bmv2" and cfg.needs_bgr
-    assert not Config(engine="modnet").needs_bgr and not Config(engine="rvm").needs_bgr
-    bad = Config(engine="nope", rvm_variant="x", modnet_ref_size=1, modnet_smooth=5, rvm_downsample=9).validated()
+    assert not Config(engine="rvm").needs_bgr
+    bad = Config(engine="nope", rvm_variant="x", rvm_downsample=9).validated()
     assert (bad.engine, bad.rvm_variant) == ("bmv2", "mobilenetv3")
-    assert (bad.modnet_ref_size, bad.modnet_smooth, bad.rvm_downsample) == (128, 0.9, 1.0)
+    assert bad.rvm_downsample == 1.0
 
 
 def test_rvm_checkpoint_is_chosen_per_variant():
@@ -267,10 +267,10 @@ def test_rvm_checkpoint_is_chosen_per_variant():
 
 def test_engine_settings_survive_roundtrip_and_old_config_defaults_to_bmv2(tmp_path):
     path = tmp_path / "config.json"
-    save_config(Config(engine="rvm", rvm_variant="resnet50", modnet_ref_size=512, rvm_downsample=0.5), path)
+    save_config(Config(engine="rvm", rvm_variant="resnet50", rvm_downsample=0.5), path)
     loaded, warning = load_config(path)
     assert warning is None
-    assert (loaded.engine, loaded.rvm_variant, loaded.modnet_ref_size, loaded.rvm_downsample) == ("rvm", "resnet50", 512, 0.5)
+    assert (loaded.engine, loaded.rvm_variant, loaded.rvm_downsample) == ("rvm", "resnet50", 0.5)
     path.write_text('{"backbone": "resnet50", "camera_index": 2}', encoding="utf-8")  # 엔진 도입 전 설정 파일
     old, _ = load_config(path)
     assert old.engine == "bmv2" and old.camera_index == 2
@@ -348,3 +348,16 @@ def test_utils_loads_images_with_korean_names(tmp_path):
     assert tuple(load_image_as_tensor(str(path), torch.device("cpu")).shape) == (1, 3, 8, 12)
     with pytest.raises(FileNotFoundError):
         load_image_as_tensor(str(tmp_path / "없음.png"), torch.device("cpu"))
+
+
+def test_config_saved_while_modnet_existed_still_loads_and_falls_back_to_bmv2(tmp_path):
+    """MODNet 엔진을 뺀 뒤에도, 예전에 MODNet을 골라 저장한 설정 파일은 오류 없이 열려야 합니다."""
+    path = tmp_path / "config.json"
+    path.write_text(
+        '{"engine": "modnet", "modnet_repo": "../MODNet", "modnet_ref_size": 384, "modnet_smooth": 0.3, "camera_index": 1}',
+        encoding="utf-8",
+    )
+    cfg, warning = load_config(path)
+    assert warning is None
+    assert cfg.engine == "bmv2" and cfg.needs_bgr and cfg.camera_index == 1
+    assert not hasattr(cfg, "modnet_repo")

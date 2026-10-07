@@ -171,11 +171,8 @@ def _choice_combo(options, current, custom_label) -> QComboBox:
 
 ENGINE_CHOICES = (
     ("BackgroundMattingV2 — 빈 배경 촬영 필요, 정밀", "bmv2"),
-    ("MODNet — 빈 배경 없이 인물만, 가벼움", "modnet"),
     ("RobustVideoMatting — 빈 배경 없이 인물만, 영상용", "rvm"),
 )
-MODNET_SIZES = ((256, "256 (빠름)"), (384, "384"), (512, "512 (정밀)"), (768, "768 (매우 느림)"))
-MODNET_SMOOTH = (("꺼짐", 0.0), ("약", 0.3), ("보통", 0.5), ("강", 0.7))
 RVM_DOWNSAMPLE = (("0.25 (빠름)", 0.25), ("0.375 (720p 권장)", 0.375), ("0.5", 0.5), ("0.75 (정밀)", 0.75))
 
 CAMERA_FORMAT_CHOICES = (
@@ -267,7 +264,7 @@ class SettingsDialog(QDialog):
         # 매팅 엔진 (선택한 엔진에 해당하는 칸만 아래에 보입니다)
         self.engine = _choice_combo(ENGINE_CHOICES, cfg.engine, lambda v: v)
         form.addRow("매팅 엔진", self.engine)
-        self._engine_rows = {"bmv2": [], "modnet": [], "rvm": []}
+        self._engine_rows = {"bmv2": [], "rvm": []}
 
         # 이미지
         self.backgrounds = PathField(
@@ -321,29 +318,6 @@ class SettingsDialog(QDialog):
         combos.setContentsMargins(0, 0, 0, 0)
         form.addRow("모델 옵션", combos_box)
         self._engine_rows["bmv2"].append(combos_box)
-
-        # MODNet
-        self.modnet_repo = PathField(cfg.modnet_repo, "dir", "폴더를 찾을 수 없습니다", "MODNet 폴더")
-        form.addRow("MODNet 코드 폴더", self.modnet_repo)
-        self.modnet_ckpt = PathField(cfg.modnet_checkpoint, "file", "파일 없음", "MODNet 가중치(.ckpt)")
-        form.addRow("MODNet 가중치", self.modnet_ckpt)
-        self.modnet_size = _choice_combo(
-            [(label, v) for v, label in MODNET_SIZES], cfg.modnet_ref_size, lambda v: f"{v} (현재 설정)"
-        )
-        self.modnet_smooth = _choice_combo(
-            [(label, v) for label, v in MODNET_SMOOTH], cfg.modnet_smooth, lambda v: f"{v:g} (현재 설정)"
-        )
-        modnet_opts = QWidget()
-        mo = QHBoxLayout(modnet_opts)
-        mo.setContentsMargins(0, 0, 0, 0)
-        for caption, combo in (("처리 해상도", self.modnet_size), ("깜빡임 줄이기", self.modnet_smooth)):
-            label = QLabel(caption)
-            label.setObjectName("muted")
-            mo.addWidget(label)
-            mo.addWidget(combo)
-        mo.addStretch(1)
-        form.addRow("MODNet 옵션", modnet_opts)
-        self._engine_rows["modnet"] += [self.modnet_repo, self.modnet_ckpt, modnet_opts]
 
         # RobustVideoMatting
         self.rvm_repo = PathField(cfg.rvm_repo, "dir", "폴더를 찾을 수 없습니다", "RobustVideoMatting 폴더")
@@ -416,10 +390,6 @@ class SettingsDialog(QDialog):
         return replace(
             self._cfg,
             engine=self.engine.currentData(),
-            modnet_repo=self.modnet_repo.text(),
-            modnet_checkpoint=self.modnet_ckpt.text(),
-            modnet_ref_size=int(self.modnet_size.currentData()),
-            modnet_smooth=float(self.modnet_smooth.currentData()),
             rvm_repo=self.rvm_repo.text(),
             rvm_variant=self.rvm_variant.currentText(),
             rvm_checkpoint=self.rvm_ckpts["mobilenetv3"].text(),

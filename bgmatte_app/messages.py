@@ -266,9 +266,8 @@ def checkpoint_missing(path: Path, backbone: str = "") -> Notice:
     )
 
 
-ENGINE_NAMES = {"bmv2": "BackgroundMattingV2", "modnet": "MODNet", "rvm": "RobustVideoMatting"}
+ENGINE_NAMES = {"bmv2": "BackgroundMattingV2", "rvm": "RobustVideoMatting"}
 _ENGINE_HELP = {
-    "modnet": "MODNet 코드(github.com/ZHKKKe/MODNet)와 가중치(.ckpt)가 필요합니다. docs/ENGINES.md 의 설치 방법을 따라 주세요.",
     "rvm": "RobustVideoMatting 코드(github.com/PeterL1n/RobustVideoMatting)와 가중치(.pth)가 필요합니다. docs/ENGINES.md 의 설치 방법을 따라 주세요.",
 }
 
