@@ -27,7 +27,7 @@ python -m bgmatte_app.selfcheck
 
 카메라 권한, 배경 이미지, `bgr.png`, 모델 로드, 1프레임 추론과 예상 FPS를 차례로 확인합니다.
 Intel Mac은 GPU 가속이 없어 CPU로 동작하므로 FPS가 낮을 수 있습니다. 설정에서 백본을 `resnet101` →
-`resnet50` 또는 `mobilenetv2`로 낮추면 빨라집니다(모델 가중치 파일도 맞춰야 합니다).
+`resnet50` 또는 `mobilenetv2`로 낮추면 빨라집니다. 설정 창에는 백본마다 가중치 칸이 따로 있어서(`models/pytorch_resnet50.pth`, `pytorch_resnet101.pth`, `pytorch_mobilenetv2.pth`) 여러 파일을 함께 두고 '백본'만 바꿔 쓸 수 있습니다. 선택한 백본의 칸에 있는 파일만 사용합니다.
 
 ## 3. 첫 실행
 

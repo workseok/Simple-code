@@ -264,8 +264,16 @@ class SettingsDialog(QDialog):
         # 모델
         self.repo = PathField(cfg.repo_path, "dir", "폴더를 찾을 수 없습니다", "BackgroundMattingV2 폴더")
         form.addRow("BackgroundMattingV2", self.repo)
-        self.checkpoint = PathField(cfg.checkpoint, "file", "파일을 찾을 수 없습니다", "모델 가중치(.pth)")
-        form.addRow("모델 가중치", self.checkpoint)
+        # 백본마다 가중치 파일이 따로 필요합니다. 아래 '백본'에서 고른 칸이 실제로 쓰입니다.
+        self.checkpoints = {}
+        for bb, value in (
+            ("resnet50", cfg.checkpoint),
+            ("resnet101", cfg.checkpoint_resnet101),
+            ("mobilenetv2", cfg.checkpoint_mobilenetv2),
+        ):
+            field = PathField(value, "file", "파일 없음 (이 백본을 쓸 때만 필요합니다)", f"{bb} 가중치(.pth)")
+            self.checkpoints[bb] = field
+            form.addRow(f"가중치 · {bb}", field)
         self.backbone = QComboBox()
         self.backbone.addItems(BACKBONES)
         self.backbone.setCurrentText(cfg.backbone)
@@ -323,7 +331,9 @@ class SettingsDialog(QDialog):
             bgr=self.bgr.text(),
             countdown_seconds=int(self.countdown.currentData()),
             repo_path=self.repo.text(),
-            checkpoint=self.checkpoint.text(),
+            checkpoint=self.checkpoints["resnet50"].text(),
+            checkpoint_resnet101=self.checkpoints["resnet101"].text(),
+            checkpoint_mobilenetv2=self.checkpoints["mobilenetv2"].text(),
             backbone=self.backbone.currentText(),
             model_type=self.model_type.currentText(),
             device=self.device.currentText(),

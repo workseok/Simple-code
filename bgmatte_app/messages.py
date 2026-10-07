@@ -255,12 +255,13 @@ def repo_bad(path: Path, err: object) -> Notice:
     )
 
 
-def checkpoint_missing(path: Path) -> Notice:
+def checkpoint_missing(path: Path, backbone: str = "") -> Notice:
+    which = f"{backbone} " if backbone else ""
     return Notice(
-        "checkpoint_missing", Level.ERROR, "모델 가중치 파일(.pth)이 없습니다",
+        "checkpoint_missing", Level.ERROR, f"{which}모델 가중치 파일(.pth)이 없습니다",
         f"{path}",
-        "BackgroundMattingV2 README의 Model/Checkpoints에서 받은 .pth 파일을 위 위치에 두거나, "
-        "설정에서 파일 위치를 바꿔 주세요.",
+        f"BackgroundMattingV2 README의 Model/Checkpoints에서 {which}용 .pth 파일을 받아 위 위치에 두거나, "
+        "설정의 모델 가중치 칸에서 파일 위치를 바꿔 주세요. 백본마다 파일이 따로 필요합니다.",
         ("open_settings",),
     )
 
@@ -269,7 +270,7 @@ def checkpoint_mismatch(model_type: str, backbone: str, err: object) -> Notice:
     return Notice(
         "checkpoint_mismatch", Level.ERROR, "가중치와 모델 설정이 맞지 않습니다",
         f"{model_type} / {backbone} 설정으로 불러오지 못했습니다. ({_short(err, 120)})",
-        "받은 가중치 파일(예: pytorch_resnet50.pth)의 백본·모델 종류가 설정과 같은지 확인해 주세요.",
+        "설정의 백본 칸과 그 백본의 가중치 칸에 지정한 파일(예: resnet101은 pytorch_resnet101.pth)이 같은 종류인지 확인해 주세요.",
         ("open_settings",),
     )
 

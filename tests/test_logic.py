@@ -210,3 +210,36 @@ def test_theme_setting_is_validated():
     assert Config(theme="light").validated().theme == "light"
     assert Config(theme="neon").validated().theme == "dark"
     assert Config().theme == "dark"
+
+
+def test_checkpoint_is_chosen_per_backbone():
+    cfg = Config(
+        checkpoint="a50.pth", checkpoint_resnet101="b101.pth", checkpoint_mobilenetv2="c.pth",
+        backbone="resnet101",
+    )
+    assert cfg.checkpoint_for() == "b101.pth"
+    assert cfg.checkpoint_for("resnet50") == "a50.pth"
+    assert cfg.checkpoint_for("mobilenetv2") == "c.pth"
+
+
+def test_all_checkpoint_paths_survive_roundtrip_and_blank_falls_back(tmp_path):
+    path = tmp_path / "config.json"
+    save_config(Config(checkpoint_resnet101="models/my101.pth"), path)
+    cfg, _ = load_config(path)
+    assert cfg.checkpoint_resnet101 == "models/my101.pth"
+    assert cfg.checkpoint == "models/pytorch_resnet50.pth"
+    path.write_text(json.dumps({"checkpoint_mobilenetv2": "  "}), encoding="utf-8")
+    cfg, _ = load_config(path)
+    assert cfg.checkpoint_mobilenetv2 == "models/pytorch_mobilenetv2.pth"
+
+
+def test_old_single_checkpoint_config_moves_to_its_backbone_slot(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"backbone": "resnet101", "checkpoint": "models/pytorch_resnet101.pth"}),
+        encoding="utf-8",
+    )
+    cfg, _ = load_config(path)
+    assert cfg.checkpoint_resnet101 == "models/pytorch_resnet101.pth"
+    assert cfg.checkpoint == "models/pytorch_resnet50.pth"
+    assert cfg.checkpoint_for() == "models/pytorch_resnet101.pth"

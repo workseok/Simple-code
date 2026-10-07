@@ -80,11 +80,11 @@ def _label(device: torch.device) -> str:
 
 def _load_model(cfg: Config, device: torch.device):
     repo = cfg.resolve(cfg.repo_path)
-    ckpt = cfg.resolve(cfg.checkpoint)
+    ckpt = cfg.resolve(cfg.checkpoint_for(cfg.backbone))
     if not repo.is_dir():
         raise NoticeError(messages.repo_missing(repo))
     if not ckpt.is_file():
-        raise NoticeError(messages.checkpoint_missing(ckpt))
+        raise NoticeError(messages.checkpoint_missing(ckpt, cfg.backbone))
 
     key = (
         str(repo), str(ckpt), cfg.model_type, cfg.backbone, cfg.backbone_scale,

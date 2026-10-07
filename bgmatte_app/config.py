@@ -48,7 +48,11 @@ def log_path() -> Path:
 class Config:
     # 모델
     repo_path: str = "../BackgroundMattingV2"
+    # 백본마다 가중치 파일이 따로 필요합니다 (층 구조가 달라 서로 바꿔 쓸 수 없습니다).
+    # checkpoint는 예전 설정 파일과의 호환을 위해 이름을 유지한 resnet50용 경로입니다.
     checkpoint: str = "models/pytorch_resnet50.pth"
+    checkpoint_resnet101: str = "models/pytorch_resnet101.pth"
+    checkpoint_mobilenetv2: str = "models/pytorch_mobilenetv2.pth"
     model_type: str = "mattingrefine"
     backbone: str = "resnet50"
     backbone_scale: float = 0.25
@@ -73,6 +77,14 @@ class Config:
 
     def resolve(self, value: str) -> Path:
         return resolve_path(value)
+
+    def checkpoint_for(self, backbone: Optional[str] = None) -> str:
+        """백본에 맞는 가중치 경로(설정 문자열)를 반환합니다. 기본은 현재 선택된 백본."""
+        backbone = backbone or self.backbone
+        return {
+            "resnet101": self.checkpoint_resnet101,
+            "mobilenetv2": self.checkpoint_mobilenetv2,
+        }.get(backbone, self.checkpoint)
 
     def validated(self) -> "Config":
         """타입/범위를 보정한 복사본을 반환합니다 (손으로 고친 config.json 방어)."""
@@ -100,7 +112,7 @@ class Config:
         values["countdown_seconds"] = min(max(values["countdown_seconds"], 1), 30)
         values["average_frames"] = min(max(values["average_frames"], 1), 60)
         values["last_background"] = max(values["last_background"], 1)
-        for name in ("repo_path", "checkpoint", "bgr", "backgrounds_dir", "legacy_background"):
+        for name in ("repo_path", "checkpoint", "checkpoint_resnet101", "checkpoint_mobilenetv2", "bgr", "backgrounds_dir", "legacy_background"):
             if not values[name].strip():
                 values[name] = getattr(defaults, name)
         return replace(self, **values)
@@ -137,7 +149,14 @@ def load_config(path: Optional[Path] = None) -> Tuple[Config, Optional[str]]:
         log.warning("설정 파일을 읽지 못했습니다: %s (%s)", path, exc)
         return Config(), f"{path} ({exc})"
     known = {f.name for f in fields(Config)}
-    cfg = Config(**{k: v for k, v in raw.items() if k in known})
+    raw = {k: v for k, v in raw.items() if k in known}
+    # 예전 설정(가중치 경로 1개): resnet50이 아닌 백본이 선택돼 있었다면 그 백본의 칸으로 옮깁니다.
+    legacy_backbone = raw.get("backbone")
+    if legacy_backbone in ("resnet101", "mobilenetv2") and "checkpoint" in raw:
+        slot = f"checkpoint_{legacy_backbone}"
+        if slot not in raw:
+            raw[slot] = raw.pop("checkpoint")
+    cfg = Config(**raw)
     return cfg.validated(), None
 
 
