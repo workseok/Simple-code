@@ -35,7 +35,12 @@ def to_tensor(frame_bgr: np.ndarray, device: torch.device) -> torch.Tensor:
 
 def load_image_as_tensor(path: str, device: torch.device) -> torch.Tensor:
     """이미지 파일(bgr.png, ai_background.png 등)을 모델 입력 텐서로 로드합니다."""
-    image = cv2.imread(path, cv2.IMREAD_COLOR)
+    # cv2.imread는 윈도우에서 한글 경로를 읽지 못해, 파일을 직접 읽어 디코딩합니다.
+    try:
+        data = np.fromfile(path, dtype=np.uint8)
+        image = cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
+    except OSError:
+        image = None
     if image is None:
         raise FileNotFoundError(f"이미지를 읽을 수 없습니다: {path}")
     return to_tensor(image, device)

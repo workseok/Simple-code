@@ -22,7 +22,6 @@ import logging
 import math
 import queue
 import shutil
-import sys
 import threading
 import time
 from pathlib import Path
@@ -35,6 +34,8 @@ from PySide6.QtGui import QImage
 
 from . import messages
 from .backgrounds import BackgroundItem
+from .camera import apply_format, open_capture
+from .imageio import imread, imwrite
 from .config import Config
 from .messages import NoticeError
 
@@ -56,10 +57,7 @@ def _default_matter_factory(cfg: Config):
 
 
 def _default_camera_factory(index: int):
-    if sys.platform == "win32":
-        # 윈도우에서는 DirectShow가 해상도 지정과 시작 속도가 더 안정적입니다.
-        return cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    return cv2.VideoCapture(index)
+    return open_capture(index)  # 윈도우는 DirectShow, 그 외는 기본 백엔드
 
 
 class PipelineWorker(QThread):
@@ -209,6 +207,7 @@ class PipelineWorker(QThread):
         try:
             if not cap.isOpened():
                 raise NoticeError(messages.camera_open_failed(cfg.camera_index))
+            apply_format(cap, cfg.camera_format)  # 해상도 지정보다 먼저
             if cfg.camera_width:
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, cfg.camera_width)
             if cfg.camera_height:
@@ -418,7 +417,7 @@ class PipelineWorker(QThread):
             if path.exists():
                 backup = path.with_name(f"{path.stem}.prev{path.suffix}")
                 shutil.copy2(path, backup)
-            if not cv2.imwrite(str(path), averaged):
+            if not imwrite(path, averaged):
                 raise OSError(f"{path} 에 이미지를 쓰지 못했습니다")
         except Exception as exc:
             log.exception("배경 저장 실패")
@@ -432,7 +431,7 @@ class PipelineWorker(QThread):
     def _read_image_size(path: Path) -> Optional[Tuple[int, int]]:
         if not path.is_file():
             return None
-        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        image = imread(path)
         if image is None:
             return None
         h, w = image.shape[:2]

@@ -1,0 +1,102 @@
+# BG Matte 윈도우 설치·사용 가이드
+
+맥에서 쓰던 앱(BackgroundMattingV2 · MODNet · RobustVideoMatting 3엔진, 번호 배경 합성, 알파 보기 등)을
+**윈도우에서 그대로** 쓰기 위한 가이드입니다. 명령어를 직접 입력할 필요 없이 파일 두 개만 더블클릭하면 됩니다.
+
+> 이 윈도우 설치기는 맥 환경에서 만들어졌고 **실제 윈도우 PC에서는 아직 실행해 보지 않았습니다.**
+> 첫 설치에서 막히는 곳이 있으면 화면에 나온 메시지를 그대로 알려 주세요. 아래 '문제 해결'에 정리해 둡니다.
+
+## 0. 준비물
+
+- Windows 10 / 11 (64비트), 인터넷 연결, 여유 공간 약 5GB
+- 카메라 또는 HDMI 캡처카드 (USB)
+- NVIDIA 그래픽카드가 있으면 자동으로 GPU(CUDA)를 씁니다. 없어도 CPU로 동작합니다 (느림).
+
+## 1. 설치 (한 번만)
+
+1. 받은 `BGMatte-Windows.zip`을 풉니다. 위치는 `C:\bgmatte-app` 처럼 **짧고 단순한 곳**을 권장합니다.
+2. 풀린 폴더의 `packaging` 안 **`install_windows.bat`** 을 더블클릭합니다.
+   - "Windows가 PC를 보호했습니다" 창이 뜨면 **추가 정보 → 실행** 을 누르세요 (인터넷에서 받은 .bat 파일에 항상 뜨는 안내입니다).
+   - Miniforge(파이썬 설치 도구)가 없으면 설치할지 묻습니다. `Y`를 입력하면 자동으로 설치합니다.
+3. 검은 창에서 글자가 올라가는 동안 기다립니다 (10~30분). 자동으로 하는 일:
+   - 전용 파이썬 환경 `bgmatte` 만들기, PyTorch 설치 (NVIDIA GPU가 있으면 GPU용을 먼저 시도)
+   - 앱 라이브러리 설치
+   - 엔진 코드 3종을 프로젝트 폴더 **옆**에 받기 (`..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting`)
+   - 가중치를 `models` 폴더에 받기 (파일 크기까지 검사)
+   - 바탕화면에 **BG Matte** 바로가기 만들기, 셀프체크 실행
+4. 마지막에 "설치가 끝났습니다"가 나오면 완료입니다.
+
+중간에 끊겨도 `install_windows.bat`을 **다시 실행**하면 받은 것은 건너뛰고 이어서 진행합니다.
+
+### 설치 옵션
+
+`install_windows.bat` 뒤에 옵션을 붙여 명령 프롬프트에서 실행합니다.
+
+| 옵션 | 효과 |
+| --- | --- |
+| `--all-weights` | BackgroundMattingV2 resnet101·mobilenetv2, RVM resnet50 가중치도 받기 (약 370MB 추가) |
+| `--cpu` | NVIDIA GPU가 있어도 CPU용 PyTorch로 설치 |
+| `--skip-torch` | PyTorch 설치 단계 건너뛰기 |
+
+## 2. 실행
+
+바탕화면의 **BG Matte** 를 더블클릭하거나 `packaging\BGMatte.bat` 을 실행합니다.
+(검은 창이 함께 열립니다. 앱 상태·오류가 그 창에 표시되니 닫지 마세요. 앱을 끄면 같이 닫힙니다.)
+
+1. 합성 배경 이미지를 **`backgrounds` 폴더**에 넣습니다 (`01_스튜디오.png`처럼 번호로 시작하는 파일 이름, 한글도 됩니다).
+2. 앱 오른쪽 위 **설정**을 열어 카메라 번호와 해상도를 고릅니다. **카메라 찾기** 버튼이 열리는 번호를 알려 줍니다.
+3. **매팅 엔진**을 고릅니다 (아래 표). 처음에는 BackgroundMattingV2가 선택되어 있습니다.
+4. BackgroundMattingV2는 빈 배경을 먼저 촬영해야 합니다 (스페이스바, 촬영 뒤 카메라 고정). MODNet/RVM은 필요 없습니다.
+5. 숫자 키 `1`~`9`로 배경 전환, `A` 알파 보기, `F` 전체 화면, `Ctrl + ,` 설정. (엔진 비교와 튜닝은 `docs/ENGINES.md`)
+
+| 엔진 | 윈도우에서의 특징 |
+| --- | --- |
+| BackgroundMattingV2 | 빈 배경 촬영 필요. 의자·소품도 분리. NVIDIA GPU가 있으면 실시간에 가까워질 가능성이 높음 (실측 필요) |
+| MODNet | 빈 배경 불필요, 사람만. 가벼움 |
+| RobustVideoMatting | 빈 배경 불필요, 사람만. 영상용. GPL-3.0 (제품 배포 시 라이선스 검토 필요) |
+
+## 3. 카메라·캡처카드 팁
+
+- 윈도우에서는 **DirectShow** 방식으로 카메라를 엽니다. 해상도 지정이 맥보다 잘 먹히는 편입니다.
+- 설정의 **영상 형식**을 `MJPG`로 바꾸면 USB 캡처카드에서 1080p가 안 나오거나 프레임이 낮을 때 개선되는 경우가 많습니다.
+  (품질은 압축 영상이라 약간 떨어질 수 있습니다. 비교해 보고 고르세요.)
+- 노트북 내장 카메라가 0번을 차지하면 캡처카드는 1번 이상입니다.
+- 화면이 검으면: 윈도우 **설정 → 개인 정보 및 보안 → 카메라**에서 '데스크톱 앱이 카메라에 액세스하도록 허용'이 켜져 있는지 확인하세요 (앱의 안내 배너 버튼으로도 열립니다).
+- 다른 프로그램(OBS, 카메라 앱, 화상회의)이 카메라를 쓰고 있으면 열리지 않습니다. 먼저 종료하세요.
+
+## 4. 파일 위치
+
+| 무엇 | 위치 |
+| --- | --- |
+| 설정 파일 | `%APPDATA%\BGMatte\config.json` |
+| 로그 | `%LOCALAPPDATA%\BGMatte\app.log` |
+| 가중치 | `<프로젝트>\models\` |
+| 엔진 코드 | `<프로젝트>\..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting` |
+| 합성 배경 / 빈 배경 | `<프로젝트>\backgrounds\`, `<프로젝트>\bgr.png` |
+
+맥에서 쓰던 설정은 이어지지 않습니다. 경로 형식이 다르기 때문에 윈도우에서 새로 정하세요.
+
+## 5. 문제 해결
+
+| 증상 | 확인 |
+| --- | --- |
+| 설치 중 `Miniforge를 찾지 못했습니다` | 창에 나온 주소에서 Miniforge3-Windows-x86_64.exe를 받아 설치한 뒤 `install_windows.bat` 재실행 |
+| 사용자 폴더 이름에 한글이 있어 설치 도중 오류 | Miniforge를 `C:\miniforge3` 에 설치하고 `install_windows.bat` 재실행 (이 경로를 먼저 찾습니다) |
+| 코드/가중치 받기 `✕` | 인터넷·회사 방화벽 확인 후 `install_windows.bat` 재실행 (zip이 막히면 git으로 대신 시도합니다). MODNet 가중치는 구글 드라이브라 막힐 수 있으며, 그 경우 안내된 주소에서 직접 받아 `models` 폴더에 넣으세요 |
+| GPU가 있는데 CPU로 돈다고 나옴 | 최신 NVIDIA 드라이버를 설치한 뒤 `install_windows.bat`을 옵션 없이 다시 실행. 확인: 앱 상태 패널 '처리 장치'가 `CUDA`인지 |
+| 앱이 바로 닫힘 | 검은 창의 메시지와 로그 파일 확인 |
+| 한글 폴더/파일 이름 | 배경 이미지와 프로젝트 폴더에 한글이 있어도 읽고 저장되도록 처리했습니다 |
+| 바로가기가 안 생김 | `packaging\BGMatte.bat`을 직접 실행하거나 우클릭 → 바로 가기 만들기 |
+| 설정을 초기화하고 싶음 | `%APPDATA%\BGMatte\config.json` 삭제 |
+
+## 6. 업데이트·삭제
+
+- 업데이트: 새 zip의 파일을 같은 폴더에 덮어쓴 뒤, 필요하면 `install_windows.bat`을 다시 실행합니다 (이미 받은 것은 건너뜁니다).
+- 삭제: 프로젝트 폴더, `..\BackgroundMattingV2`, `..\MODNet`, `..\RobustVideoMatting`, 바탕화면 바로가기,
+  conda 환경(`conda env remove -n bgmatte`)을 지우면 됩니다.
+
+## 7. 구조 (개발자용)
+
+- `packaging/install_windows.bat`: conda 찾기/설치 → 환경 `bgmatte` 생성 → `packaging/setup_windows.py` 실행. 설치 로직은 대부분 파이썬이라 테스트할 수 있습니다 (`tests/test_setup_windows.py`).
+- `packaging/BGMatte.bat`: 설치기가 기록한 `packaging/python_path.txt` 의 파이썬으로 `python -m bgmatte_app` 실행.
+- 플랫폼 차이는 `bgmatte_app/camera.py`(카메라 백엔드), `config.py`(설정·로그 경로), `imageio.py`(한글 경로 이미지 입출력)에 모여 있습니다.

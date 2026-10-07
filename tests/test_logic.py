@@ -274,3 +274,77 @@ def test_engine_settings_survive_roundtrip_and_old_config_defaults_to_bmv2(tmp_p
     path.write_text('{"backbone": "resnet50", "camera_index": 2}', encoding="utf-8")  # 엔진 도입 전 설정 파일
     old, _ = load_config(path)
     assert old.engine == "bmv2" and old.camera_index == 2
+
+
+def test_windows_settings_and_log_live_under_appdata(monkeypatch, tmp_path):
+    from bgmatte_app import config as cfgmod
+
+    monkeypatch.setattr(cfgmod.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
+    assert cfgmod.config_path() == tmp_path / "Roaming" / "BGMatte" / "config.json"
+    assert cfgmod.log_path() == tmp_path / "Local" / "BGMatte" / "app.log"
+
+
+def test_open_capture_uses_directshow_only_on_windows(monkeypatch):
+    from bgmatte_app import camera
+
+    calls = []
+    monkeypatch.setattr(camera.cv2, "VideoCapture", lambda *a: calls.append(a) or object())
+    monkeypatch.setattr(camera.sys, "platform", "win32")
+    camera.open_capture(2)
+    monkeypatch.setattr(camera.sys, "platform", "darwin")
+    camera.open_capture(1)
+    assert calls == [(2, camera.cv2.CAP_DSHOW), (1,)]
+
+
+def test_camera_format_validation_and_mjpg_request():
+    from bgmatte_app import camera
+
+    assert Config(camera_format="x").validated().camera_format == "auto"
+    assert Config(camera_format="mjpg").validated().camera_format == "mjpg"
+
+    class Cap:
+        def __init__(self):
+            self.sets = []
+
+        def set(self, prop, value):
+            self.sets.append(prop)
+
+    cap = Cap()
+    camera.apply_format(cap, "auto")
+    assert cap.sets == []
+    camera.apply_format(cap, "mjpg")
+    assert cap.sets == [camera.cv2.CAP_PROP_FOURCC]
+
+
+def test_imageio_roundtrips_korean_file_names(tmp_path):
+    import numpy as np
+
+    from bgmatte_app.imageio import imread, imwrite
+
+    image = (np.random.rand(20, 30, 3) * 255).astype("uint8")
+    path = tmp_path / "한글 폴더" / "01_스튜디오.png"
+    path.parent.mkdir()
+    assert imwrite(path, image)
+    back = imread(path)
+    assert back is not None and back.shape == image.shape and (back == image).all()
+    assert imread(tmp_path / "없는파일.png") is None
+    (tmp_path / "빈파일.png").write_bytes(b"")
+    assert imread(tmp_path / "빈파일.png") is None
+    (tmp_path / "깨진.png").write_bytes(b"not an image")
+    assert imread(tmp_path / "깨진.png") is None
+
+
+def test_utils_loads_images_with_korean_names(tmp_path):
+    torch = pytest.importorskip("torch")
+    import numpy as np
+
+    from bgmatte_app.imageio import imwrite
+    from utils import load_image_as_tensor
+
+    path = tmp_path / "배경.png"
+    assert imwrite(path, np.zeros((8, 12, 3), "uint8"))
+    assert tuple(load_image_as_tensor(str(path), torch.device("cpu")).shape) == (1, 3, 8, 12)
+    with pytest.raises(FileNotFoundError):
+        load_image_as_tensor(str(tmp_path / "없음.png"), torch.device("cpu"))

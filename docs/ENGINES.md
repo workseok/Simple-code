@@ -81,7 +81,7 @@ bash packaging/install_engines.sh          # MODNet + RVM(mobilenetv3) 한 번�
   ③ 설정 화면 칸(`dialogs.py`)을 추가합니다. 워커와 화면 코드는 건드리지 않아도 됩니다.
 - **같은 이름의 패키지 충돌 방지**: BackgroundMattingV2와 RVM은 모두 `model`이라는 패키지를 씁니다. 엔진을 불러올 때 해당 이름의
   모듈 캐시를 잠시 치우고 그 저장소만 경로 맨 앞에 두는 방식(`_isolated_import`)이라, 앱을 끄지 않고 엔진을 바꿔도 섞이지 않습니다.
-- **윈도우 준비 상태** (아직 윈도우에서 실행해 확인하지는 않았습니다):
+- **윈도우**: 설치와 사용은 `docs/APP_WINDOWS.md`를 보세요. 준비 상태 (아직 윈도우 PC에서 실행해 확인하지는 않았습니다):
   - 장치 선택은 이미 `cuda → mps → cpu` 순이라 NVIDIA GPU가 있으면 자동으로 씁니다.
   - 카메라는 윈도우에서 DirectShow(`CAP_DSHOW`)로 엽니다. 설정 폴더는 `~/.config/BGMatte`, 로그는 `~/.cache/BGMatte`입니다.
   - 카메라 권한 안내 버튼은 윈도우에서 '개인정보 → 카메라' 설정 창(`ms-settings:privacy-webcam`)을 엽니다.

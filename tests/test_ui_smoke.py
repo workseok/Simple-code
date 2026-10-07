@@ -437,8 +437,9 @@ def test_settings_dialog_roundtrip_and_custom_values(qapp):
 
     dialog.resolution.setCurrentIndex(dialog.resolution.findData("1920x1080"))
     dialog.countdown.setCurrentIndex(dialog.countdown.findData(10))
+    dialog.camera_format.setCurrentIndex(dialog.camera_format.findData("mjpg"))
     out = dialog.result_config()
-    assert (out.camera_width, out.camera_height, out.countdown_seconds) == (1920, 1080, 10)
+    assert (out.camera_width, out.camera_height, out.countdown_seconds, out.camera_format) == (1920, 1080, 10, "mjpg")
 
 
 def test_find_cameras_selects_first_working_one(qapp):

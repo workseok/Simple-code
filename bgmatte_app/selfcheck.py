@@ -16,6 +16,7 @@ from pathlib import Path
 from . import camera_auth
 from .backgrounds import scan_backgrounds
 from .config import config_path, load_config
+from .imageio import imread, imwrite
 from .messages import NoticeError
 
 
@@ -88,11 +89,11 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as tmpdir:
             if bgr_path.is_file():
                 bgr_file = bgr_path
-                bgr = cv2.imread(str(bgr_path), cv2.IMREAD_COLOR)
+                bgr = imread(bgr_path)
             else:  # 빈 배경이 아직 없으면 임의의 이미지로 속도만 측정합니다
                 bgr = np.random.default_rng(0).integers(0, 255, size=(720, 1280, 3), dtype=np.uint8)
                 bgr_file = Path(tmpdir) / "bgr.png"
-                cv2.imwrite(str(bgr_file), bgr)
+                imwrite(bgr_file, bgr)
             matter.set_background(backgrounds[0].path)
             matter.set_bgr(bgr_file)
 

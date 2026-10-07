@@ -20,3 +20,4 @@ bgr.png
 
 # GUI app build output
 dist/
+*.ckpt

@@ -178,6 +178,11 @@ MODNET_SIZES = ((256, "256 (빠름)"), (384, "384"), (512, "512 (정밀)"), (768
 MODNET_SMOOTH = (("꺼짐", 0.0), ("약", 0.3), ("보통", 0.5), ("강", 0.7))
 RVM_DOWNSAMPLE = (("0.25 (빠름)", 0.25), ("0.375 (720p 권장)", 0.375), ("0.5", 0.5), ("0.75 (정밀)", 0.75))
 
+CAMERA_FORMAT_CHOICES = (
+    ("장치 기본값 (자동)", "auto"),
+    ("MJPG (캡처카드 고해상도·고프레임용)", "mjpg"),
+)
+
 RESOLUTIONS = (
     ("장치 기본값 (자동)", "0x0"),
     ("1280 × 720", "1280x720"),
@@ -189,11 +194,11 @@ RESOLUTIONS = (
 
 def probe_cameras(max_index: int = 5) -> List[Tuple[int, bool, str]]:
     """카메라 번호 0..max_index-1을 열어 보고 (번호, 열림 여부, 해상도) 목록을 반환합니다."""
-    import cv2
+    from ..camera import open_capture
 
     found: List[Tuple[int, bool, str]] = []
     for index in range(max_index):
-        cap = cv2.VideoCapture(index)
+        cap = open_capture(index)
         try:
             if not cap.isOpened():
                 found.append((index, False, ""))
@@ -255,6 +260,9 @@ class SettingsDialog(QDialog):
             lambda key: key.replace("x", " × ") + " (현재 설정)",
         )
         form.addRow("해상도", self.resolution)
+        self.camera_format = _choice_combo(CAMERA_FORMAT_CHOICES, cfg.camera_format, lambda v: v)
+        self.camera_format.setToolTip("캡처카드에서 1080p가 안 나오거나 프레임이 낮을 때 MJPG를 시도해 보세요.")
+        form.addRow("영상 형식", self.camera_format)
 
         # 매팅 엔진 (선택한 엔진에 해당하는 칸만 아래에 보입니다)
         self.engine = _choice_combo(ENGINE_CHOICES, cfg.engine, lambda v: v)
@@ -417,6 +425,7 @@ class SettingsDialog(QDialog):
             rvm_checkpoint=self.rvm_ckpts["mobilenetv3"].text(),
             rvm_checkpoint_resnet50=self.rvm_ckpts["resnet50"].text(),
             rvm_downsample=float(self.rvm_ds.currentData()),
+            camera_format=self.camera_format.currentData(),
             camera_index=int(self.camera_index.currentData()),
             camera_width=int(self.resolution.currentData().split("x")[0]),
             camera_height=int(self.resolution.currentData().split("x")[1]),

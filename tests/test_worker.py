@@ -258,7 +258,7 @@ def test_capture_can_be_cancelled(env):
 
 def test_capture_failure_is_reported_and_pipeline_continues(env, monkeypatch):
     _, cfg, folder, _ = env
-    monkeypatch.setattr(cv2, "imwrite", lambda *a, **k: False)
+    monkeypatch.setattr("bgmatte_app.worker.imwrite", lambda *a, **k: False)
     worker, _, _, rec = make_worker(cfg, folder)
     worker.start()
     assert wait_for(lambda: rec.has_state("running"))
@@ -447,3 +447,24 @@ def test_capture_command_is_declined_with_a_notice_when_engine_needs_no_bgr(env)
     assert wait_for(lambda: "capture_not_needed" in rec.codes())
     assert not rec.has_state("capturing") and not bgr.exists()
     stop(worker)
+
+
+def test_mjpg_is_requested_before_resolution(env):
+    _, cfg, folder, _ = env
+    cfg.camera_format, cfg.camera_width, cfg.camera_height = "mjpg", 1280, 720
+
+    class RecordingCamera(FakeCamera):
+        def __init__(self):
+            super().__init__()
+            self.props = []
+
+        def set(self, prop, value=None):
+            self.props.append(prop)
+            return True
+
+    camera = RecordingCamera()
+    worker, _, _, rec = make_worker(cfg, folder, camera=camera)
+    worker.start()
+    assert wait_for(lambda: rec.has_state("running"))
+    stop(worker)
+    assert camera.props[:3] == [cv2.CAP_PROP_FOURCC, cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]

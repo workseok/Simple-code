@@ -27,11 +27,14 @@ BACKBONES = ("resnet50", "resnet101", "mobilenetv2")
 REFINE_MODES = ("full", "sampling", "thresholding")
 DEVICES = ("auto", "mps", "cuda", "cpu")
 THEMES = ("dark", "light")
+CAMERA_FORMATS = ("auto", "mjpg")
 
 
 def config_dir() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "BGMatte"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "BGMatte"
     base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     return Path(base) / "BGMatte"
 
@@ -44,6 +47,8 @@ def log_path() -> Path:
     """런처(.app)가 stdout/stderr를 모으는 로그 파일 위치와 같습니다."""
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Logs" / "BGMatte" / "app.log"
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "BGMatte" / "app.log"
     return Path.home() / ".cache" / "BGMatte" / "app.log"
 
 
@@ -83,6 +88,7 @@ class Config:
     camera_index: int = 0
     camera_width: int = 0
     camera_height: int = 0
+    camera_format: str = "auto"  # auto = 장치 기본 | mjpg = 압축 영상 요청 (캡처카드 1080p/고프레임용)
     # 배경 촬영
     countdown_seconds: int = 5
     average_frames: int = 10
@@ -130,6 +136,7 @@ class Config:
         pick("refine_mode", REFINE_MODES)
         pick("device", DEVICES)
         pick("theme", THEMES)
+        pick("camera_format", CAMERA_FORMATS)
 
         values["modnet_ref_size"] = min(max(values["modnet_ref_size"], 128), 1024)
         values["modnet_smooth"] = min(max(values["modnet_smooth"], 0.0), 0.9)
