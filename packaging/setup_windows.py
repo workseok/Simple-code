@@ -282,6 +282,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     write_python_path()
     make_shortcut()
     say("\n셀프체크 (모델 불러오기·추론 점검)")
+    say("  ※ '합성 배경이 없습니다' 표시는 처음에는 정상입니다. 이미지를 backgrounds 폴더에 넣으면 사라집니다.")
     subprocess.run([sys.executable, "-m", "bgmatte_app.selfcheck"], cwd=str(ROOT))
 
     say()
