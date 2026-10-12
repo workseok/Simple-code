@@ -19,6 +19,12 @@
 코드베이스는 OS와 무관하게 하나로 유지되며, 저장소나 브랜치를 OS별로
 나누지 않습니다. 위 두 문서는 같은 코드에 대한 OS별 설치 절차만 다룹니다.
 
+## BG Matte 앱 설치 (Windows / Mac)
+
+실시간 합성 모니터링 앱의 설치 방법은 **[docs/INSTALL_BGMATTE.md](docs/INSTALL_BGMATTE.md)** 에 모아 두었습니다.
+Windows는 `packaging/install_windows.bat` 더블클릭으로 자동 설치되며([docs/APP_WINDOWS.md](docs/APP_WINDOWS.md)),
+Mac은 [docs/APP_MAC.md](docs/APP_MAC.md)를 따릅니다.
+
 ## GUI 앱 (macOS)
 
 미리보기 창만 뜨던 `realtime_matte.py` 대신, 단축키 안내·배경 번호 표시·오류 안내를 갖춘 GUI 앱을
