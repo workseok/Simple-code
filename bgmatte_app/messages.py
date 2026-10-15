@@ -219,6 +219,24 @@ def bg_invalid(number: int, count: int) -> Notice:
     )
 
 
+def camera_in_use(index: int) -> Notice:
+    return Notice(
+        "camera_in_use", Level.WARN, f"카메라 {index}번은 다른 창에서 쓰고 있습니다",
+        "한 카메라는 한 창에서만 열 수 있습니다.",
+        "다른 창의 카메라 번호를 먼저 바꾸거나 그 창을 닫아 주세요.",
+        banner=False,
+    )
+
+
+def no_free_camera(count: int) -> Notice:
+    return Notice(
+        "no_free_camera", Level.WARN, "모니터 창에 쓸 수 있는 카메라 번호가 없습니다",
+        f"0~{count - 1}번이 모두 다른 창에서 쓰이고 있습니다.",
+        "다른 모니터 창을 닫은 뒤 다시 시도해 주세요.",
+        banner=False,
+    )
+
+
 def bg_not_ready() -> Notice:
     return Notice(
         "bg_not_ready", Level.INFO, "배경 전환은 실행 중에만 할 수 있습니다",

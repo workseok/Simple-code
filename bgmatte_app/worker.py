@@ -163,7 +163,7 @@ class PipelineWorker(QThread):
         self._step(STEP_BACKGROUND, "active")
         if not self._backgrounds:
             raise NoticeError(messages.bg_none(cfg.resolve(cfg.backgrounds_dir)))
-        bgr_path = cfg.resolve(cfg.bgr)
+        bgr_path = cfg.resolve(cfg.bgr_for_camera())
         bgr_wh = self._read_image_size(bgr_path) if cfg.needs_bgr else None
         if cfg.needs_bgr and bgr_wh is None:
             if bgr_path.exists():

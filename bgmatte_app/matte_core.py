@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -37,6 +38,9 @@ from utils import (  # noqa: E402
 log = logging.getLogger(__name__)
 
 _MODEL_CACHE: Dict[tuple, object] = {}
+# 모니터 창을 여러 개 띄우면 모델을 동시에 불러올 수 있는데, _isolated_import 가 sys.modules 를 임시로
+# 바꾸므로 한 번에 하나씩만 불러옵니다. (불러온 모델은 캐시를 통해 창끼리 공유됩니다.)
+_LOAD_LOCK = threading.Lock()
 _GPU_DISABLED = False  # GPU 추론이 한 번 실패하면 이번 실행에서는 다시 시도하지 않음
 
 
@@ -240,9 +244,10 @@ class Matter:
     # -- 준비 ---------------------------------------------------------------
     def load(self) -> str:
         """모델을 불러오고 장치 이름을 반환합니다. 실패하면 NoticeError."""
-        self.device, self.device_label = resolve_device(self.cfg.device)
         loader, engine_cls = _LOADERS[self.cfg.engine]
-        self._cache_key, model = loader(self.cfg, self.device)
+        with _LOAD_LOCK:
+            self.device, self.device_label = resolve_device(self.cfg.device)
+            self._cache_key, model = loader(self.cfg, self.device)
         self._engine = engine_cls(self.cfg, model)
         return self.device_label
 

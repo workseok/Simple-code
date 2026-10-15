@@ -277,6 +277,43 @@ class BusRow(QWidget):
             repolish(button)
 
 
+class CamRow(QWidget):
+    """미리보기 아래의 카메라 번호 버튼 (0~4번). 쓰고 있는 번호만 켜집니다."""
+
+    chosen = Signal(int)
+    SLOTS = 5
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(3)
+        label = QLabel("카메라")
+        label.setObjectName("muted")
+        row.addWidget(label)
+        row.addSpacing(4)
+        self._buttons: List[QPushButton] = []
+        for i in range(self.SLOTS):
+            button = QPushButton(str(i))
+            button.setObjectName("bus")
+            button.setProperty("current", False)
+            button.setProperty("hue", "cyan")
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            button.setToolTip(f"카메라 {i}번으로 바꿉니다")
+            button.clicked.connect(lambda _=False, n=i: self.chosen.emit(n))
+            row.addWidget(button)
+            self._buttons.append(button)
+        row.addStretch(1)
+
+    def set_current(self, index: int) -> None:
+        for i, button in enumerate(self._buttons):
+            button.setProperty("current", i == index)
+            repolish(button)
+
+    def button(self, index: int) -> QPushButton:
+        return self._buttons[index]
+
+
 # ---------------------------------------------------------------- 미리보기
 class PreviewView(QWidget):
     """카메라/합성 영상을 비율 유지로 그리고, 그 위에 안내 문구·카운트다운·HUD를 얹습니다."""

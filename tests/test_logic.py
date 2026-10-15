@@ -149,6 +149,8 @@ def _all_notices():
         messages.bg_all_failed(),
         messages.bg_invalid(7, 5),
         messages.bg_not_ready(),
+        messages.camera_in_use(1),
+        messages.no_free_camera(5),
         messages.bg_load_failed("a.png", "boom"),
         messages.repo_missing(p),
         messages.repo_bad(p, ImportError("no model")),
@@ -361,3 +363,12 @@ def test_config_saved_while_modnet_existed_still_loads_and_falls_back_to_bmv2(tm
     assert warning is None
     assert cfg.engine == "bmv2" and cfg.needs_bgr and cfg.camera_index == 1
     assert not hasattr(cfg, "modnet_repo")
+
+
+def test_bgr_path_is_per_camera():
+    from bgmatte_app.config import Config
+
+    assert Config(camera_index=0, bgr="bgr.png").bgr_for_camera() == "bgr.png"
+    assert Config(camera_index=2, bgr="bgr.png").bgr_for_camera().endswith("bgr_cam2.png")
+    nested = Config(camera_index=1, bgr="shots/bg.jpg").bgr_for_camera().replace("\\", "/")
+    assert nested == "shots/bg_cam1.jpg"

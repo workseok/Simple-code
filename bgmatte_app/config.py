@@ -107,6 +107,16 @@ class Config:
         variant = variant or self.rvm_variant
         return self.rvm_checkpoint_resnet50 if variant == "resnet50" else self.rvm_checkpoint
 
+    def bgr_for_camera(self) -> str:
+        """현재 카메라 번호에 맞는 빈 배경 이미지 경로(설정 문자열).
+
+        빈 배경은 카메라마다 다르므로 0번은 설정값(bgr.png) 그대로, 1번 이상은 bgr_cam1.png 처럼
+        번호를 붙인 파일을 씁니다. 카메라를 2대 이상 쓸 때 서로 덮어쓰지 않게 하기 위해서입니다."""
+        if self.camera_index == 0:
+            return self.bgr
+        p = Path(self.bgr)
+        return str(p.with_name(f"{p.stem}_cam{self.camera_index}{p.suffix}"))
+
     @property
     def needs_bgr(self) -> bool:
         """빈 배경(bgr.png) 촬영이 필요한 엔진인지. rvm은 필요 없습니다."""

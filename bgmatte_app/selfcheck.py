@@ -54,7 +54,7 @@ def main() -> int:
     else:
         failed = True
         _bad(f"합성 배경이 없습니다 ({cfg.resolve(cfg.backgrounds_dir)})", "PNG/JPG 파일을 넣어 주세요.")
-    bgr_path = cfg.resolve(cfg.bgr)
+    bgr_path = cfg.resolve(cfg.bgr_for_camera())
     if bgr_path.is_file():
         _ok(f"빈 배경 {bgr_path.name}")
     else:

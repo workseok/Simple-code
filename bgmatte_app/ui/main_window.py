@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import replace
 from datetime import datetime
 from typing import Callable, List, Optional, Sequence
 
@@ -34,7 +35,7 @@ from ..worker import PipelineWorker
 from . import theme
 from .dialogs import IntroDialog, SettingsDialog, probe_cameras
 from .widgets import (
-    BusRow, NoticeBanner, PreviewView, StepBar, TallyDot, app_icon_pixmap, keycaps, repolish, section_header,
+    BusRow, CamRow, NoticeBanner, PreviewView, StepBar, TallyDot, app_icon_pixmap, keycaps, repolish, section_header,
 )
 
 log = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ SHORTCUTS = (
     (("Space",), "빈 배경 촬영 (촬영 중에는 취소)", "pink"),
     (("A",), "알파 매트 함께 보기", "cyan"),
     (("F",), "전체 화면", "cyan"),
+    (("M",), "모니터 창 추가 (카메라 2대 동시 보기)", "cyan"),
     (("H",), "사용 안내", "cyan"),
     (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료", "amber"),
     (_PREFS_KEYS, "설정", ""),
@@ -187,6 +189,7 @@ class MainWindow(QMainWindow):
 
         self._worker: Optional[PipelineWorker] = None
         self._retiring: List[PipelineWorker] = []
+        self._monitors: list = []  # 열려 있는 모니터 창 (MonitorWindow)
         self._awaiting_permission = False
         self._state = "idle"
         self._step_text = ""
@@ -231,7 +234,25 @@ class MainWindow(QMainWindow):
         left.addWidget(self.banner)
         left.addWidget(self.preview, 1)
 
-        # 미리보기 바로 아래: 시작/정지, 배경 촬영, 설정 버튼과 안내 한 줄
+        # 미리보기 바로 아래: 카메라 번호 버튼과 모니터 창 추가 버튼
+        self.camera_bar = QWidget()
+        self.camera_bar.setObjectName("console")
+        cam_line = QHBoxLayout(self.camera_bar)
+        cam_line.setContentsMargins(0, 0, 0, 0)
+        cam_line.setSpacing(10)
+        self.cam_row = CamRow()
+        self.cam_row.set_current(self.cfg.camera_index)
+        self.cam_row.chosen.connect(self.select_camera)
+        cam_line.addWidget(self.cam_row)
+        cam_line.addStretch(1)
+        self.btn_monitor = QPushButton("＋ 모니터 창")
+        self.btn_monitor.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_monitor.setToolTip("다른 카메라의 실시간 합성 영상을 별도 창으로 띄웁니다 (M)")
+        self.btn_monitor.clicked.connect(self.open_monitor)
+        cam_line.addWidget(self.btn_monitor)
+        left.addWidget(self.camera_bar)
+
+        # 그 아래: 시작/정지, 배경 촬영, 설정 버튼과 안내 한 줄
         self.controls = QWidget()
         self.controls.setObjectName("console")
         bar = QHBoxLayout(self.controls)
@@ -441,6 +462,7 @@ class MainWindow(QMainWindow):
         add("Space", self.toggle_capture)
         add("A", self.toggle_alpha)
         add("F", self.toggle_fullscreen)
+        add("M", self.open_monitor)
         add("H", self.show_intro)
         add("Esc", self.on_escape)
         add(QKeySequence.StandardKey.Preferences, self.open_settings)
@@ -462,6 +484,9 @@ class MainWindow(QMainWindow):
             return
         self.banner.clear()
         self.steps.reset()
+        if any(m.uses_camera(self.cfg.camera_index) for m in self._monitors):
+            self._fail_with(replace(messages.camera_in_use(self.cfg.camera_index), banner=True))
+            return
         self._set_state("starting")
         self._step_text = STEP_HINT[0]
         self._refresh_overlay()
@@ -556,6 +581,52 @@ class MainWindow(QMainWindow):
             return
         self._worker.select_background(number)
 
+    def camera_in_use(self, index: int, exclude: object = None) -> bool:
+        """그 번호의 카메라를 (exclude 창을 뺀) 다른 창이 열고 있는지."""
+        if exclude is not self and self.cfg.camera_index == index and (
+            self._worker is not None or self._awaiting_permission
+        ):
+            return True
+        return any(m is not exclude and m.uses_camera(index) for m in self._monitors)
+
+    def select_camera(self, index: int) -> None:
+        """미리보기 아래 번호 버튼: 이 창이 쓰는 카메라를 바꿉니다 (실행 중이면 새 카메라로 다시 시작)."""
+        if index == self.cfg.camera_index:
+            return
+        if self.camera_in_use(index, self):
+            self._add_notice(messages.camera_in_use(index))
+            return
+        self.cfg.camera_index = index
+        self.cam_row.set_current(index)
+        self._persist()
+        if self._worker is not None or self._awaiting_permission:
+            self.restart_pipeline()
+
+    def open_monitor(self) -> None:
+        """메인 창과 별개로, 다른 카메라의 실시간 합성 영상을 보는 창을 하나 더 엽니다."""
+        from .monitor_window import MonitorWindow
+
+        free = [
+            i for i in range(CamRow.SLOTS) if i != self.cfg.camera_index and not self.camera_in_use(i, None)
+        ]
+        if not free:
+            self._add_notice(messages.no_free_camera(CamRow.SLOTS))
+            return
+        cfg = replace(self.cfg, camera_index=free[0])
+        taken = {m._title_no for m in self._monitors}
+        number = next(n for n in range(2, 99) if n not in taken)
+        window = MonitorWindow(
+            cfg, self._worker_factory, self.camera_in_use, self._on_monitor_closed,
+            title_no=number, auto_start=False,
+        )
+        self._monitors.append(window)
+        window.show()
+        window.start_pipeline()  # 바로 시작해야 곧이어 여는 창이 같은 카메라 번호를 고르지 않습니다
+
+    def _on_monitor_closed(self, window) -> None:
+        if window in self._monitors:
+            self._monitors.remove(window)
+
     def toggle_alpha(self) -> None:
         if self._worker is not None and self._state in ("running", "capturing"):
             self._worker.toggle_alpha()
@@ -578,7 +649,7 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-        for w in (self.side, self.steps, self.controls):
+        for w in (self.side, self.steps, self.controls, self.camera_bar):
             w.setVisible(not full)
         self._update_hud()
 
@@ -603,6 +674,7 @@ class MainWindow(QMainWindow):
             self._persist()
             self._scan_backgrounds()
             self._refresh_engine_view()
+            self.cam_row.set_current(self.cfg.camera_index)
         if was_active or accepted:
             self.start_pipeline()
 
@@ -788,6 +860,8 @@ class MainWindow(QMainWindow):
 
     # ================================================================ 종료
     def closeEvent(self, event: QCloseEvent) -> None:
+        for monitor in list(self._monitors):
+            monitor.close()
         self._persist()
         self._awaiting_permission = False
         workers = list(self._retiring)

@@ -61,6 +61,8 @@ class Harness:
         self.bgr = tmp_path / "bgr.png"
         if with_bgr:
             cv2.imwrite(str(self.bgr), synthetic_frame(64, 48))
+            for cam in range(1, 5):  # 카메라마다 빈 배경 파일이 따로 있습니다 (bgr_cam1.png …)
+                cv2.imwrite(str(tmp_path / f"bgr_cam{cam}.png"), synthetic_frame(64, 48))
         self.cfg = Config(
             bgr=str(self.bgr),
             backgrounds_dir=str(self.folder),
@@ -590,3 +592,141 @@ def test_default_engine_keeps_capture_button_and_footnote(harness):
     assert "빈 배경을 촬영한 뒤" in w.footnote.text()
     h.start_running()
     assert w.btn_capture.isEnabled()
+
+
+# ---------------------------------------------------------------- 카메라 번호 버튼 / 모니터 창
+def test_camera_buttons_sit_below_preview_and_show_current(harness):
+    h = harness()
+    w = h.window
+    w.show()
+    h.qapp.processEvents()
+    top = lambda widget: widget.mapTo(w, widget.rect().topLeft()).y()  # noqa: E731
+    assert top(w.cam_row) >= w.preview.mapTo(w, w.preview.rect().bottomLeft()).y()
+    assert [b.text() for b in w.cam_row._buttons] == ["0", "1", "2", "3", "4"]
+    assert w.cam_row.button(0).property("current") is True
+
+
+def test_clicking_camera_button_restarts_with_that_camera_and_saves(harness):
+    h = harness()
+    cams = []
+    h.camera_kwargs = {}
+    orig = h._factory
+
+    def factory(cfg, backgrounds):
+        cams.append(cfg.camera_index)
+        return orig(cfg, backgrounds)
+
+    h.window._worker_factory = factory
+    h.start_running()
+    h.window.cam_row.button(2).click()
+    assert h.until(lambda: h.window._state == "running" and cams[-1] == 2)
+    assert h.window.cfg.camera_index == 2
+    assert h.window.cam_row.button(2).property("current") is True
+    assert h.saved, "카메라를 바꾸면 설정을 저장합니다"
+
+
+def test_each_camera_needs_its_own_empty_background(harness):
+    h = harness()
+    (h.tmp / "bgr_cam2.png").unlink()
+    h.start_running()
+    h.window.cam_row.button(2).click()
+    assert h.until(lambda: h.window._state == "waiting_bg"), "2번 카메라의 빈 배경이 없으면 촬영을 안내합니다"
+    h.window.cam_row.button(0).click()
+    assert h.until(lambda: h.window._state == "running"), "0번은 기존 bgr.png 를 그대로 씁니다"
+
+
+def test_camera_button_while_stopped_only_selects(harness):
+    h = harness()
+    h.window.cam_row.button(1).click()
+    pump(h.qapp, 30)
+    assert h.window.cfg.camera_index == 1
+    assert h.window._worker is None
+
+
+def test_monitor_window_runs_another_camera_with_its_own_worker(harness):
+    h = harness()
+    cams = []
+    orig = h._factory
+
+    def factory(cfg, backgrounds):
+        cams.append(cfg.camera_index)
+        return orig(cfg, backgrounds)
+
+    h.window._worker_factory = factory
+    h.start_running()
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    assert h.until(lambda: mon._state == "running" and mon.preview.has_frame())
+    assert cams == [0, 1], "메인은 0번, 모니터 창은 비어 있는 가장 낮은 번호(1번)"
+    assert mon.cfg.camera_index == 1 and h.window.cfg.camera_index == 0
+    assert h.window._state == "running", "메인 창은 계속 실행 중"
+    assert "카메라 1번" in mon.windowTitle()
+
+
+def test_same_camera_cannot_be_opened_in_two_windows(harness):
+    h = harness()
+    h.start_running()
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    assert h.until(lambda: mon._state == "running")
+    mon.cam_row.button(0).click()  # 0번은 메인이 사용 중
+    assert mon.cfg.camera_index == 1
+    assert "다른 창에서 쓰고 있습니다" in mon.note.text()
+    h.window.cam_row.button(1).click()  # 1번은 모니터가 사용 중
+    pump(h.qapp, 30)
+    assert h.window.cfg.camera_index == 0
+    assert any("다른 창에서 쓰고 있습니다" in t for t in h.history_titles())
+
+
+def test_monitor_background_buttons_and_independent_stop(harness):
+    h = harness()
+    h.start_running()
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    assert h.until(lambda: mon._state == "running")
+    mon.select_background(2)
+    assert h.until(lambda: mon._current_bg == 2)
+    assert h.window._current_bg == 1, "모니터 창의 배경 전환은 메인 창에 영향을 주지 않습니다"
+    mon.btn_toggle.click()
+    assert mon._worker is None and mon._state == "stopped"
+    assert h.window._state == "running"
+
+
+def test_monitor_stopped_frees_its_camera_and_closing_main_closes_monitors(harness):
+    h = harness()
+    h.start_running()
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    assert h.until(lambda: mon._state == "running")
+    assert h.window.camera_in_use(1, None)
+    mon.stop_pipeline()
+    assert not h.window.camera_in_use(1, None)
+    mon.start_pipeline()
+    assert h.until(lambda: mon._state == "running")
+    h.window.close()
+    pump(h.qapp, 50)
+    assert h.window._monitors == []
+
+
+def test_no_free_camera_number_explains(harness):
+    h = harness()
+    h.start_running()
+    for _ in range(4):
+        h.window.open_monitor()
+    assert len(h.window._monitors) == 4
+    h.window.open_monitor()
+    assert len(h.window._monitors) == 4
+    assert any("쓸 수 있는 카메라 번호가 없습니다" in t for t in h.history_titles())
+
+
+def test_main_start_refuses_camera_held_by_monitor(harness):
+    h = harness()
+    h.window.cfg.camera_index = 1
+    h.start_running()
+    h.window.open_monitor()  # 메인(1번)을 피해 0번
+    mon = h.window._monitors[0]
+    assert mon.cfg.camera_index == 0
+    h.window.stop_pipeline()
+    h.window.cfg.camera_index = 0  # 모니터가 쓰는 번호로 바꾼 뒤 시작
+    h.window.start_pipeline()
+    assert h.window._state == "error" and h.window._worker is None
