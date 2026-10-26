@@ -110,3 +110,8 @@
 - `packaging/install_windows.bat`: conda 찾기/설치 → 환경 `bgmatte` 생성 → `packaging/setup_windows.py` 실행. 설치 로직은 대부분 파이썬이라 테스트할 수 있습니다 (`tests/test_setup_windows.py`).
 - `packaging/BGMatte.bat`: 설치기가 기록한 `packaging/python_path.txt` 의 파이썬으로 `python -m bgmatte_app` 실행.
 - 플랫폼 차이는 `bgmatte_app/camera.py`(카메라 백엔드), `config.py`(설정·로그 경로), `imageio.py`(한글 경로 이미지 입출력)에 모여 있습니다.
+
+## 화면 표시 (패널 켜고 끄기)
+
+오른쪽 콘솔의 **상태 · 단축키 · 알림 기록** 패널은 설정 → **화면 표시**에서 각각 켜고 끌 수 있습니다 (저장하면 바로 적용되고 다음 실행에도 유지됩니다). 합성 배경 패널은 항상 보입니다.
+알림 기록을 꺼도 오류 안내 배너는 미리보기 위에 그대로 나타납니다. 상단의 '카메라 → 배경 → 모델 → 합성' 진행 표시줄은 없앴고, 준비 중 안내는 미리보기 화면의 문구로 보여 줍니다.

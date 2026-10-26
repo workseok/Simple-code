@@ -730,3 +730,79 @@ def test_main_start_refuses_camera_held_by_monitor(harness):
     h.window.cfg.camera_index = 0  # 모니터가 쓰는 번호로 바꾼 뒤 시작
     h.window.start_pipeline()
     assert h.window._state == "error" and h.window._worker is None
+
+
+# ---------------------------------------------------------------- 패널 켜고 끄기 / 단계 표시 제거
+def test_step_bar_is_not_shown_but_errors_still_use_the_banner(harness):
+    h = harness(camera_kwargs={"opened": False})
+    w = h.window
+    w.start_pipeline()
+    assert h.until(lambda: w._state == "error")
+    assert not w.steps.isVisible(), "카메라-배경-모델-합성 표시줄은 보이지 않습니다"
+    assert w.banner.isVisible(), "오류 안내 배너는 그대로 보입니다"
+    w.toggle_fullscreen()
+    w.toggle_fullscreen()
+    assert not w.steps.isVisible(), "전체 화면을 다녀와도 다시 나타나지 않습니다"
+
+
+def test_panels_are_visible_by_default(harness):
+    h = harness()
+    w = h.window
+    assert w.panel_status.isVisible() and w.panel_shortcuts.isVisible() and w.panel_history.isVisible()
+
+
+def test_settings_can_turn_panels_off_and_on(harness, monkeypatch):
+    from dataclasses import replace
+
+    h = harness()
+    w = h.window
+    state = {"cfg": None}
+
+    class StubDialog:
+        def __init__(self, cfg, parent=None, camera_probe=None):
+            self.cfg = cfg
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def result_config(self):
+            return replace(self.cfg, **state["cfg"])
+
+    monkeypatch.setattr(mw, "SettingsDialog", StubDialog)
+    state["cfg"] = {"show_status": False, "show_shortcuts": False}
+    w.open_settings()
+    assert not w.panel_status.isVisible() and not w.panel_shortcuts.isVisible()
+    assert w.panel_history.isVisible()
+    assert w.bus.isVisible(), "합성 배경 패널은 항상 보입니다"
+    assert h.saved, "표시 설정도 저장됩니다"
+    state["cfg"] = {"show_history": False, "show_status": True}
+    w.open_settings()
+    assert w.panel_status.isVisible() and not w.panel_history.isVisible()
+
+
+def test_hidden_history_panel_still_records_and_banner_still_shows_errors(harness):
+    h = harness()
+    w = h.window
+    w.cfg.show_history = False
+    w._apply_panel_visibility()
+    w._add_notice(messages.camera_open_failed(0))
+    assert w.history.count() == 1
+    assert w.banner.isVisible()
+
+
+def test_settings_dialog_has_panel_checkboxes_roundtrip(qapp):
+    dialog = SettingsDialog(Config(show_shortcuts=False))
+    assert dialog.show_status.isChecked() and not dialog.show_shortcuts.isChecked() and dialog.show_history.isChecked()
+    dialog.show_history.setChecked(False)
+    dialog.show_shortcuts.setChecked(True)
+    out = dialog.result_config()
+    assert (out.show_status, out.show_shortcuts, out.show_history) == (True, True, False)
+
+
+def test_panel_flags_survive_save_and_load(tmp_path):
+    from bgmatte_app.config import load_config, save_config
+
+    path = tmp_path / "c.json"
+    save_config(Config(show_status=False, show_history=False), path)
+    cfg, warning = load_config(path)
+    assert warning is None and (cfg.show_status, cfg.show_shortcuts, cfg.show_history) == (False, True, False)

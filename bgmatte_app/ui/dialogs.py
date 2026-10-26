@@ -345,6 +345,20 @@ class SettingsDialog(QDialog):
         ro.addStretch(1)
         form.addRow("RVM 옵션", rvm_opts)
         self._engine_rows["rvm"] += [self.rvm_repo, rvm_opts]
+
+        # 화면 표시: 오른쪽 콘솔의 보조 패널을 켜고 끕니다 (합성 배경 패널은 항상 보임)
+        panels = QVBoxLayout()
+        panels.setSpacing(6)
+        self.show_status = QCheckBox("상태 (엔진·처리 장치·해상도·속도)")
+        self.show_shortcuts = QCheckBox("단축키 안내")
+        self.show_history = QCheckBox("알림 기록")
+        for box, value in ((self.show_status, cfg.show_status), (self.show_shortcuts, cfg.show_shortcuts),
+                           (self.show_history, cfg.show_history)):
+            box.setChecked(value)
+            box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            panels.addWidget(box)
+        form.addRow("화면 표시", panels)
+
         self._form = form
         self.engine.currentIndexChanged.connect(self._apply_engine_visibility)
         self._apply_engine_visibility()
@@ -409,4 +423,7 @@ class SettingsDialog(QDialog):
             backbone=self.backbone.currentText(),
             model_type=self.model_type.currentText(),
             device=self.device.currentText(),
+            show_status=self.show_status.isChecked(),
+            show_shortcuts=self.show_shortcuts.isChecked(),
+            show_history=self.show_history.isChecked(),
         ).validated()

@@ -225,12 +225,14 @@ class MainWindow(QMainWindow):
         # ---- 왼쪽: 단계 / 배너 / 미리보기
         left = QVBoxLayout()
         left.setSpacing(10)
+        # 상단 '카메라-배경-모델-합성' 진행 표시는 보이지 않게 합니다 (준비 단계 안내는 미리보기 위 문구로 대신).
+        # 단계 상태를 기록하는 객체는 그대로 두어서 워커 이벤트 처리 코드는 바뀌지 않습니다.
         self.steps = StepBar()
+        self.steps.hide()
         self.banner = NoticeBanner(ACTION_LABELS)
         self.banner.action_requested.connect(self._on_action)
         self.banner.cleared.connect(self._refresh_overlay)
         self.preview = PreviewView()
-        left.addWidget(self.steps)
         left.addWidget(self.banner)
         left.addWidget(self.preview, 1)
 
@@ -329,6 +331,7 @@ class MainWindow(QMainWindow):
             lay.addLayout(head)
             outer.addWidget(inner)
             body_col.addWidget(frame)
+            self._last_panel = frame
             return lay, head
 
         # 합성 배경
@@ -355,6 +358,7 @@ class MainWindow(QMainWindow):
 
         # 상태
         col, _ = make_panel("상태", "cyan", compact=True)
+        self.panel_status = self._last_panel
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(3)
@@ -377,6 +381,7 @@ class MainWindow(QMainWindow):
 
         # 단축키 (키 역할별로 색을 나눔: 배경 번호=보라, 촬영=분홍, 보기=청록, 종료=노랑)
         col, _ = make_panel("단축키", "amber", compact=True)
+        self.panel_shortcuts = self._last_panel
         keys = QGridLayout()
         keys.setHorizontalSpacing(12)
         keys.setVerticalSpacing(4)
@@ -391,6 +396,7 @@ class MainWindow(QMainWindow):
 
         # 알림 기록
         col, _ = make_panel("알림 기록", "pink", compact=True)
+        self.panel_history = self._last_panel
         self.history = QListWidget()
         self.history.setObjectName("history")
         self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -402,6 +408,13 @@ class MainWindow(QMainWindow):
         scroll.setWidget(body)
         side.addWidget(scroll, 1)
         root.addWidget(self.side)
+        self._apply_panel_visibility()
+
+    def _apply_panel_visibility(self) -> None:
+        """설정 → 화면 표시에서 고른 대로 상태·단축키·알림 기록 패널을 보이거나 숨깁니다."""
+        self.panel_status.setVisible(self.cfg.show_status)
+        self.panel_shortcuts.setVisible(self.cfg.show_shortcuts)
+        self.panel_history.setVisible(self.cfg.show_history)
 
     def _build_theme_switch(self) -> QHBoxLayout:
         """헤더의 '어둡게 | 밝게' 선택 버튼."""
@@ -649,7 +662,7 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-        for w in (self.side, self.steps, self.controls, self.camera_bar):
+        for w in (self.side, self.controls, self.camera_bar):
             w.setVisible(not full)
         self._update_hud()
 
@@ -674,6 +687,7 @@ class MainWindow(QMainWindow):
             self._persist()
             self._scan_backgrounds()
             self._refresh_engine_view()
+            self._apply_panel_visibility()
             self.cam_row.set_current(self.cfg.camera_index)
         if was_active or accepted:
             self.start_pipeline()
