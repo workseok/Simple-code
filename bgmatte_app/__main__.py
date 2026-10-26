@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import faulthandler
 import logging
+import logging.handlers
 import sys
 from pathlib import Path
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -26,21 +29,70 @@ def _set_mac_app_name(name: str) -> None:
         pass
 
 
-def main() -> int:
+def fatal_box(title: str, text: str) -> None:
+    """콘솔 창이 없는 실행(pythonw)에서도 사용자가 볼 수 있게 오류 창을 띄웁니다. 윈도우 외에는 stderr에 씁니다."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(0, text, title, 0x10)  # MB_ICONERROR
+            return
+        except Exception:
+            pass
+    print(f"[{title}] {text}", file=sys.stderr)
+
+
+def setup_logging(path: Optional[Path] = None) -> Optional[Path]:
+    """로그 설정. 윈도우에서는 콘솔 창 없이(pythonw) 실행하므로 stdout/stderr가 없습니다 —
+    로그 파일에 쓰도록 연결해, 라이브러리가 print/경고를 내도 죽지 않고 기록이 남게 합니다.
+    다른 OS(맥 .app 런처)는 런처가 출력을 같은 로그 파일로 모아 주므로 건드리지 않습니다."""
+    handlers = []
+    log_file: Optional[Path] = None
+    if sys.platform == "win32" or path is not None:
+        from .config import log_path
+
+        log_file = path or log_path()
+        try:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(
+                logging.handlers.RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+            )
+            if sys.stderr is None or sys.stdout is None:  # 콘솔 없음
+                stream = open(log_file, "a", encoding="utf-8", buffering=1)
+                if sys.stdout is None:
+                    sys.stdout = stream
+                if sys.stderr is None:
+                    sys.stderr = stream
+        except OSError:
+            log_file = None
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler(sys.stderr))
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        stream=sys.stderr,
+        handlers=handlers or [logging.NullHandler()],
+        force=True,
     )
+    try:
+        if sys.stderr is not None:
+            faulthandler.enable(file=sys.stderr)  # 네이티브 크래시도 로그에 남김
+    except Exception:
+        pass
+    return log_file
+
+
+def main() -> int:
+    log_file = setup_logging()
+    log.info("BG Matte 시작 (python %s)", sys.version.split()[0])
 
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
     except ImportError as exc:
-        print(
-            "[오류] PySide6를 불러올 수 없습니다. 아래 명령으로 설치한 뒤 다시 실행해 주세요.\n"
-            "  pip install -r requirements-app.txt\n"
-            f"  원본 오류: {exc}",
-            file=sys.stderr,
+        fatal_box(
+            "BG Matte",
+            "PySide6를 불러올 수 없습니다.\n\n"
+            "install_windows.bat 을 다시 실행해 설치를 마쳐 주세요.\n"
+            f"원본 오류: {exc}" + (f"\n\n로그: {log_file}" if log_file else ""),
         )
         return 1
 
@@ -77,5 +129,16 @@ def main() -> int:
     return app.exec()
 
 
+def _run() -> int:
+    try:
+        return main()
+    except Exception as exc:  # 창이 뜨기 전의 오류: 콘솔이 없어도 보이게 합니다
+        log.exception("시작 중 오류")
+        from .config import log_path
+
+        fatal_box("BG Matte", f"시작하지 못했습니다.\n\n{exc}\n\n로그: {log_path()}")
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_run())

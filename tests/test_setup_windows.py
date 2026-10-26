@@ -135,3 +135,16 @@ def test_fetch_repo_reports_failure_without_git(tmp_path, monkeypatch):
     monkeypatch.setattr(sw.shutil, "which", lambda _name: None)
     assert not sw.fetch_repo("Repo", (tmp_path / "nope.zip").as_uri(), tmp_path)
     assert not (tmp_path / "Repo").exists()
+
+
+def test_shortcut_uses_windowless_pythonw_when_available(tmp_path):
+    (tmp_path / "python.exe").write_bytes(b"")
+    (tmp_path / "pythonw.exe").write_bytes(b"")
+    target, args = sw.shortcut_command(str(tmp_path / "python.exe"), root=tmp_path / "app")
+    assert Path(target).name == "pythonw.exe" and args == "-m bgmatte_app"
+
+
+def test_shortcut_falls_back_to_bat_without_pythonw(tmp_path):
+    (tmp_path / "python.exe").write_bytes(b"")
+    target, args = sw.shortcut_command(str(tmp_path / "python.exe"), root=tmp_path / "app")
+    assert Path(target).name == "BGMatte.bat" and args == ""

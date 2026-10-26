@@ -1,0 +1,59 @@
+name: release
+
+# 새 버전 배포: bgmatte_app/__init__.py 의 __version__ 을 올리고 커밋한 뒤, 같은 번호로 태그를 붙여 올립니다.
+#   git tag v1.0.1 && git push origin v1.0.1
+# 그러면 윈도우 서버에서 BGMatte_Setup_v1.0.1.exe 를 만들어 GitHub 'Releases' 에 올려 줍니다.
+# 설치 파일만 확인하고 싶을 때는 Actions 탭에서 이 워크플로를 'Run workflow' 로 직접 실행합니다 (릴리스는 만들지 않음).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 버전 읽기
+        id: ver
+        shell: bash
+        run: |
+          VER=$(python -c "import bgmatte_app; print(bgmatte_app.__version__)")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "버전: $VER"
+
+      - name: 태그와 버전이 같은지 확인
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME#v}" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "태그($GITHUB_REF_NAME)와 __version__(${{ steps.ver.outputs.version }})이 다릅니다. __version__ 을 고치고 커밋한 뒤 태그를 다시 붙여 주세요."
+            exit 1
+          fi
+
+      - name: Inno Setup 설치
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: 설치 파일 만들기
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" "packaging\BGMatte_Setup.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BGMatte_Setup_v${{ steps.ver.outputs.version }}
+          path: packaging/Output/BGMatte_Setup_v${{ steps.ver.outputs.version }}.exe
+
+      - name: GitHub Releases 에 올리기
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/Output/BGMatte_Setup_v${{ steps.ver.outputs.version }}.exe
+          generate_release_notes: true

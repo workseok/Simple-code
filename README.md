@@ -24,6 +24,7 @@
 실시간 합성 모니터링 앱의 설치 방법은 **[docs/INSTALL_BGMATTE.md](docs/INSTALL_BGMATTE.md)** 에 모아 두었습니다.
 Windows는 `packaging/install_windows.bat` 더블클릭으로 자동 설치되며([docs/APP_WINDOWS.md](docs/APP_WINDOWS.md)),
 Mac은 [docs/APP_MAC.md](docs/APP_MAC.md)를 따릅니다.
+새 버전을 팀에 배포하는 방법(설치 파일 자동 빌드)은 [docs/RELEASE.md](docs/RELEASE.md)에 있습니다.
 
 ## GUI 앱 (macOS)
 

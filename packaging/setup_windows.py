@@ -208,19 +208,32 @@ def install_torch(force_cpu: bool) -> None:
 
 
 # ------------------------------------------------------------------ 나머지 단계
+def shortcut_command(python_exe: str = "", root: Path = ROOT) -> Tuple[str, str]:
+    """바탕화면 바로가기가 실행할 (프로그램, 인자). 콘솔 창이 뜨지 않도록 pythonw.exe 로 앱을 직접 띄웁니다.
+    pythonw.exe 가 없으면 예전 방식(BGMatte.bat, 검은 창이 함께 뜸)으로 대신합니다."""
+    exe = Path(python_exe or sys.executable)
+    windowless = exe.with_name("pythonw.exe")
+    if windowless.is_file():
+        return str(windowless), "-m bgmatte_app"
+    return str(root / "packaging" / "BGMatte.bat"), ""
+
+
 def make_shortcut() -> None:
     """바탕화면에 'BG Matte' 바로가기를 만듭니다 (실패해도 설치는 계속)."""
-    bat = ROOT / "packaging" / "BGMatte.bat"
+    target, arguments = shortcut_command()
     icon = ROOT / "packaging" / "AppIcon.ico"
     ps = (
         "$d=[Environment]::GetFolderPath('Desktop');"
         "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'BG Matte.lnk'));"
-        f"$s.TargetPath='{bat}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon}';$s.Save();$d"
+        f"$s.TargetPath='{target}';$s.Arguments='{arguments}';$s.WorkingDirectory='{ROOT}';"
+        f"$s.IconLocation='{icon}';$s.Save();$d"
     )
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60)
         if out.returncode == 0:
             say(f"  ✓ 바탕화면 바로가기를 만들었습니다: {out.stdout.strip()}\\BG Matte.lnk")
+            if not arguments:
+                say("  · pythonw.exe 를 찾지 못해 검은 창이 함께 뜨는 방식으로 만들었습니다.")
         else:
             say("  · 바로가기를 만들지 못했습니다. packaging\\BGMatte.bat 을 직접 실행하세요.")
     except Exception:

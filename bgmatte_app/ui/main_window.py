@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import camera_auth, messages
+from .. import __version__, camera_auth, messages
 from ..backgrounds import BackgroundItem, scan_backgrounds
 from ..config import APP_NAME, Config, save_config
 from ..messages import Level, Notice
@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
         self._fps = 0.0
         self._alpha = False
 
-        self.setWindowTitle(APP_NAME)
+        self.setWindowTitle(f"{APP_NAME} {__version__}")
         self.resize(1240, 820)
         self.setMinimumSize(1000, 660)
         theme.set_theme(self.cfg.theme)

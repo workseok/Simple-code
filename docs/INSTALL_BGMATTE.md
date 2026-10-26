@@ -104,7 +104,9 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
 | --- | --- |
 | `packaging/install_windows.bat` | 윈도우 원클릭 설치기 (conda 찾기/설치 → 환경 생성 → setup 실행) |
 | `packaging/setup_windows.py` | torch·라이브러리·엔진·가중치·바로가기·셀프체크 |
-| `packaging/BGMatte.bat` | 윈도우 실행 파일 |
+| `packaging/BGMatte.bat` | 윈도우 실행 파일 (검은 콘솔 창이 함께 뜸. 바탕화면 바로가기는 창 없는 `pythonw.exe` 로 직접 실행) |
+| `packaging/BGMatte_Setup.iss` | 설치 마법사 `.exe` 제작 스크립트 (Inno Setup). 배포 방법은 [RELEASE.md](RELEASE.md) |
+| `packaging/build_release.bat`, `bump_version.py` | 설치 파일 빌드 / 버전 올리기 |
 | `packaging/AppIcon.ico` / `.icns` | 아이콘 |
 | `packaging/build_app.sh`, `install_engines.sh` | Mac 앱 빌드·엔진 설치 |
 | `requirements.txt`, `requirements-app.txt` | 파이썬 라이브러리 목록 |
