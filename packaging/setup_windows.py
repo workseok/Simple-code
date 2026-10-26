@@ -5,11 +5,14 @@
   2. 앱 라이브러리 설치 (requirements.txt, requirements-app.txt)
   3. 매팅 엔진 코드 3종을 프로젝트 폴더 '옆'에 내려받기 (git 불필요, zip으로 받음)
        ../BackgroundMattingV2  ../RobustVideoMatting
-  4. 가중치 내려받기 (파일 크기로 검증): models/ 아래
-  5. 바탕화면 바로가기 만들기, 셀프체크 실행
+  4. 가중치 5종을 모두 내려받기 (파일 크기로 검증, 약 540MB): models/ 아래
+  5. 바탕화면 바로가기 만들기, 셀프체크, '인터넷 없이 쓸 준비가 됐는지' 확인
+
+설치가 끝나면 앱은 인터넷 없이 동작합니다 (엔진 코드·가중치가 모두 이 PC에 있고, 앱은 실행 중 어디에도 접속하지 않습니다).
 
 옵션:
-  --all-weights   BackgroundMattingV2 resnet101/mobilenetv2, RVM resnet50 가중치도 받기 (약 370MB 추가)
+  --minimal       꼭 필요한 가중치 2종만 받기 (BackgroundMattingV2 resnet50, RVM mobilenetv3). 용량을 아끼고 싶을 때
+  --all-weights   예전 옵션 (이제는 기본 동작이라 아무 일도 하지 않습니다)
   --cpu           NVIDIA GPU가 있어도 CPU용 PyTorch로 설치
   --skip-torch    PyTorch 설치 단계를 건너뛰기
 """
@@ -39,7 +42,7 @@ REPOS = {
 BMV2 = "https://github.com/PeterL1n/BackgroundMattingV2/releases/download/v1.0.0/"
 RVM = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/"
 
-# (저장 이름, URL, 정상 파일 크기(바이트), 기본 설치 여부)
+# (저장 이름, URL, 정상 파일 크기(바이트), 최소 설치에 포함 여부). 기본 설치는 5종 모두 받습니다.
 WEIGHTS: Tuple[Tuple[str, str, int, bool], ...] = (
     ("pytorch_resnet50.pth", BMV2 + "pytorch_resnet50.pth", 161_356_827, True),
     ("rvm_mobilenetv3.pth", RVM + "rvm_mobilenetv3.pth", 15_217_721, True),
@@ -51,6 +54,19 @@ WEIGHTS: Tuple[Tuple[str, str, int, bool], ...] = (
 
 def say(text: str = "") -> None:
     print(text, flush=True)
+
+
+def offline_missing(root: Path = ROOT) -> List[str]:
+    """인터넷 없이 모든 엔진·백본을 쓰기 위해 이 PC에 있어야 하는데 빠진 항목 이름 목록(비어 있으면 준비 완료)."""
+    missing: List[str] = []
+    for name in REPOS:
+        folder = root.parent / name
+        if not (folder / "model").is_dir():
+            missing.append(f"{name} 코드")
+    for name, _url, size, _core in WEIGHTS:
+        if not file_ok(root / "models" / name, size):
+            missing.append(name)
+    return missing
 
 
 # ------------------------------------------------------------------ 내려받기 도우미
@@ -220,7 +236,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="BG Matte 윈도우 설치 도우미")
-    parser.add_argument("--all-weights", action="store_true")
+    parser.add_argument("--all-weights", action="store_true", help="(예전 옵션, 기본 동작과 같습니다)")
+    parser.add_argument("--minimal", action="store_true", help="필수 가중치 2종만 받기")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--skip-torch", action="store_true")
     args = parser.parse_args(argv)
@@ -245,8 +262,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             problems.append(f"{name} 코드")
 
     say("\n[4/5] 가중치")
-    for name, url, size, default in WEIGHTS:
-        if default or args.all_weights:
+    for name, url, size, core in WEIGHTS:
+        if core or not args.minimal:
             if not download(url, models / name, size):
                 problems.append(name)
 
@@ -262,7 +279,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         say("일부 항목이 실패했습니다: " + ", ".join(problems))
         say("인터넷 연결을 확인하고 install_windows.bat 을 다시 실행하면 이어서 받습니다.")
         return 1
+    missing = offline_missing()
+    if missing and not args.minimal:
+        say("설치는 끝났지만 아직 빠진 파일이 있습니다: " + ", ".join(missing))
+        say("install_windows.bat 을 다시 실행해 주세요.")
+        return 1
     say("설치가 끝났습니다. 바탕화면의 'BG Matte'를 실행하세요. (설정 → 매팅 엔진에서 엔진을 고릅니다)")
+    if not missing:
+        say("엔진 코드 2종과 가중치 5종이 모두 이 PC에 있습니다. 이제 인터넷 연결 없이 사용할 수 있습니다.")
+    else:
+        say("--minimal 로 설치해서 일부 가중치가 없습니다: " + ", ".join(missing))
     return 0
 
 

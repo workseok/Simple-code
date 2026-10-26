@@ -258,8 +258,8 @@ def repo_missing(path: Path) -> Notice:
     return Notice(
         "repo_missing", Level.ERROR, "BackgroundMattingV2 폴더를 찾을 수 없습니다",
         f"{path}",
-        "git clone https://github.com/PeterL1n/BackgroundMattingV2.git 으로 내려받은 뒤, "
-        "설정에서 그 폴더를 지정해 주세요.",
+        "윈도우는 packaging\\install_windows.bat 을 다시 실행하면 빠진 코드와 가중치를 모두 받습니다. "
+        "직접 받으려면 git clone https://github.com/PeterL1n/BackgroundMattingV2.git 후 설정에서 그 폴더를 지정해 주세요.",
         ("open_settings",),
     )
 
@@ -278,7 +278,8 @@ def checkpoint_missing(path: Path, backbone: str = "") -> Notice:
     return Notice(
         "checkpoint_missing", Level.ERROR, f"{which}모델 가중치 파일(.pth)이 없습니다",
         f"{path}",
-        f"BackgroundMattingV2 README의 Model/Checkpoints에서 {which}용 .pth 파일을 받아 위 위치에 두거나, "
+        "윈도우는 packaging\\install_windows.bat 을 다시 실행하면 빠진 가중치를 모두 받습니다. "
+        f"직접 받으려면 BackgroundMattingV2 README의 Model/Checkpoints에서 {which}용 .pth 파일을 받아 위 위치에 두거나, "
         "설정의 모델 가중치 칸에서 파일 위치를 바꿔 주세요. 백본마다 파일이 따로 필요합니다.",
         ("open_settings",),
     )
@@ -286,7 +287,8 @@ def checkpoint_missing(path: Path, backbone: str = "") -> Notice:
 
 ENGINE_NAMES = {"bmv2": "BackgroundMattingV2", "rvm": "RobustVideoMatting"}
 _ENGINE_HELP = {
-    "rvm": "RobustVideoMatting 코드(github.com/PeterL1n/RobustVideoMatting)와 가중치(.pth)가 필요합니다. docs/ENGINES.md 의 설치 방법을 따라 주세요.",
+    "rvm": "RobustVideoMatting 코드(github.com/PeterL1n/RobustVideoMatting)와 가중치(.pth)가 필요합니다. "
+    "윈도우는 packaging\\install_windows.bat 을 다시 실행하면 자동으로 받고, 그 밖의 환경은 docs/ENGINES.md 의 설치 방법을 따라 주세요.",
 }
 
 

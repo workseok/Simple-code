@@ -31,7 +31,7 @@ git clone -b claude/determined-mccarthy-5aul8m https://github.com/workseok/simpl
 
 1. 풀린 폴더의 `packaging` → **`install_windows.bat`** 더블클릭
    ("Windows가 PC를 보호했습니다"가 뜨면 **추가 정보 → 실행**)
-2. 검은 창에서 10~30분 대기. 자동으로 하는 일: 파이썬 환경(`bgmatte`, Python 3.11) 생성 → PyTorch(NVIDIA GPU면 CUDA용 먼저 시도) → 라이브러리 → 엔진 코드 2종 + 가중치 다운로드 → 바탕화면 바로가기 → 셀프체크
+2. 검은 창에서 10~30분 대기. 자동으로 하는 일: 파이썬 환경(`bgmatte`, Python 3.11) 생성 → PyTorch(NVIDIA GPU면 CUDA용 먼저 시도) → 라이브러리 → 엔진 코드 2종 + 가중치 5종 전부 다운로드 (약 540MB) → 바탕화면 바로가기 → 셀프체크
 3. "설치가 끝났습니다"가 나오면 완료. 바탕화면 **BG Matte** 실행
 
 중간에 끊기면 `install_windows.bat`을 다시 실행하세요. 받은 것은 건너뛰고 이어서 진행합니다.
@@ -46,11 +46,19 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
   2. 설치 위치를 **`C:\miniforge3`** 로 지정 (사용자 이름이 한글이면 특히 중요. 설치기가 이 경로를 먼저 찾습니다)
   3. `install_windows.bat` 재실행
 
+### 2-1-1. 설치가 끝나면 인터넷이 필요 없습니다
+
+설치기는 마지막에 엔진 코드 2종과 가중치 5종이 모두 이 PC에 있는지 확인하고,
+`엔진 코드 2종과 가중치 5종이 모두 이 PC에 있습니다. 이제 인터넷 연결 없이 사용할 수 있습니다.` 라고 알려 줍니다.
+이 문구가 보이면 이후에는 오프라인 PC에서도 동작합니다 (앱은 실행 중 어디에도 접속하지 않습니다).
+이 문구 대신 `빠진 파일이 있습니다`가 나오면 `install_windows.bat`을 다시 실행하세요.
+
 ### 2-2. 설치 옵션 (명령 프롬프트에서 `install_windows.bat` 뒤에 붙임)
 
 | 옵션 | 효과 |
 | --- | --- |
-| `--all-weights` | 추가 가중치까지 받기 (약 370MB) |
+| `--minimal` | 꼭 필요한 가중치 2종만 받기 (기본은 가중치 5종 모두, 약 540MB) |
+| `--all-weights` | 예전 옵션 (이제 기본 동작) |
 | `--cpu` | GPU가 있어도 CPU용으로 설치 |
 | `--skip-torch` | PyTorch 설치 건너뛰기 |
 

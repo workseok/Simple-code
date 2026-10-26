@@ -22,9 +22,9 @@
    - 전용 파이썬 환경 `bgmatte` 만들기, PyTorch 설치 (NVIDIA GPU가 있으면 GPU용을 먼저 시도)
    - 앱 라이브러리 설치
    - 엔진 코드 2종을 프로젝트 폴더 **옆**에 받기 (`..\BackgroundMattingV2`, `..\RobustVideoMatting`)
-   - 가중치를 `models` 폴더에 받기 (파일 크기까지 검사)
+   - 가중치 5종 전부를 `models` 폴더에 받기 (약 540MB, 파일 크기까지 검사)
    - 바탕화면에 **BG Matte** 바로가기 만들기, 셀프체크 실행
-4. 마지막에 "설치가 끝났습니다"가 나오면 완료입니다.
+4. 마지막에 "설치가 끝났습니다"와 "이제 인터넷 연결 없이 사용할 수 있습니다"가 나오면 완료입니다. 가중치 5종과 엔진 코드가 모두 이 PC에 있다는 뜻입니다.
 
 중간에 끊겨도 `install_windows.bat`을 **다시 실행**하면 받은 것은 건너뛰고 이어서 진행합니다.
 
@@ -34,7 +34,8 @@
 
 | 옵션 | 효과 |
 | --- | --- |
-| `--all-weights` | BackgroundMattingV2 resnet101·mobilenetv2, RVM resnet50 가중치도 받기 (약 370MB 추가) |
+| `--minimal` | 꼭 필요한 가중치 2종(BackgroundMattingV2 resnet50, RVM mobilenetv3)만 받기. 기본은 가중치 5종 모두 (약 540MB) |
+| `--all-weights` | 예전 옵션. 이제 기본 동작이라 아무 일도 하지 않습니다 |
 | `--cpu` | NVIDIA GPU가 있어도 CPU용 PyTorch로 설치 |
 | `--skip-torch` | PyTorch 설치 단계 건너뛰기 |
 

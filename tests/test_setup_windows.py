@@ -75,9 +75,48 @@ def test_weight_table_matches_app_default_paths():
         assert Path(configured).name in sw.REPOS, f"설치 도우미가 받지 않는 기본 저장소: {configured}"
 
 
-def test_default_install_includes_the_weights_each_engine_needs_to_start():
-    default = {name for name, _u, _s, default in sw.WEIGHTS if default}
-    assert {"pytorch_resnet50.pth", "rvm_mobilenetv3.pth"} <= default
+def test_minimal_set_includes_the_weights_each_engine_needs_to_start():
+    core = {name for name, _u, _s, core in sw.WEIGHTS if core}
+    assert {"pytorch_resnet50.pth", "rvm_mobilenetv3.pth"} <= core
+
+
+
+def test_offline_report_lists_everything_missing_then_nothing(tmp_path, monkeypatch):
+    root = tmp_path / "app"
+    root.mkdir()
+    missing = sw.offline_missing(root)
+    assert len(missing) == len(sw.REPOS) + len(sw.WEIGHTS)
+    # 크기 검사를 우회하기 위해 작은 크기로 바꾼 표로 '모두 있는' 상태를 확인
+    small = tuple((n, u, 10, c) for n, u, _s, c in sw.WEIGHTS)
+    monkeypatch.setattr(sw, "WEIGHTS", small)
+    for name in sw.REPOS:
+        (tmp_path / name / "model").mkdir(parents=True)
+    (root / "models").mkdir()
+    for n, *_ in small:
+        (root / "models" / n).write_bytes(b"x" * 10)
+    assert sw.offline_missing(root) == []
+    (root / "models" / small[2][0]).write_bytes(b"x" * 3)  # 크기가 틀린(받다 만) 파일
+    assert sw.offline_missing(root) == [small[2][0]]
+
+
+def test_default_downloads_every_weight_and_minimal_only_the_core(tmp_path, monkeypatch):
+    got = []
+    monkeypatch.setattr(sw, "download", lambda url, dest, size=None: got.append(dest.name) or True)
+    monkeypatch.setattr(sw, "ROOT", tmp_path / "app")
+    (tmp_path / "app").mkdir()
+    for fn in ("torch_installed", "cuda_works", "has_nvidia_gpu"):
+        monkeypatch.setattr(sw, fn, lambda *a, **k: True)
+    monkeypatch.setattr(sw, "pip", lambda *a, **k: None)
+    monkeypatch.setattr(sw, "fetch_repo", lambda *a, **k: True)
+    monkeypatch.setattr(sw, "write_python_path", lambda: None)
+    monkeypatch.setattr(sw, "make_shortcut", lambda: None)
+    monkeypatch.setattr(sw.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setattr(sw, "offline_missing", lambda root=None: [])
+    sw.main(["--skip-torch"])
+    assert sorted(got) == sorted(n for n, *_ in sw.WEIGHTS)
+    got.clear()
+    sw.main(["--skip-torch", "--minimal"])
+    assert sorted(got) == ["pytorch_resnet50.pth", "rvm_mobilenetv3.pth"]
 
 
 def test_fetch_repo_falls_back_to_git_when_zip_download_fails(tmp_path, monkeypatch):
