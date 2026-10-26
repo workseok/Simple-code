@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
@@ -66,7 +67,9 @@ def sha256(path: Path) -> str:
 
 def pip_download(dest: Path, *args: str) -> bool:
     cmd = [sys.executable, "-m", "pip", "download", "--dest", str(dest), *TARGET, *args]
-    return subprocess.run(cmd).returncode == 0
+    # 한국어 윈도우(cp949)에서 UTF-8 텍스트를 읽다 멈추지 않도록 UTF-8 모드로 실행합니다.
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    return subprocess.run(cmd, env=env).returncode == 0
 
 
 def download_wheels(wheels: Path, cuda_tags: Sequence[str]) -> List[str]:

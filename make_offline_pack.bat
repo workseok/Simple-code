@@ -1,5 +1,7 @@
 @echo off
 chcp 65001 >nul
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
 title BG Matte 오프라인 팩 만들기
 rem 이 파일이 있는 폴더(packaging 폴더가 보이는 곳)에서 실행됩니다. 경로를 입력할 필요가 없습니다.
 cd /d "%~dp0"

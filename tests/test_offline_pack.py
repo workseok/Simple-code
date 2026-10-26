@@ -168,3 +168,15 @@ def test_pack_excludes_user_data_when_copying_app(tmp_path):
     shutil.copytree(src, tmp_path / "out", ignore=bp.IGNORE)
     kept = {p.relative_to(tmp_path / "out").as_posix() for p in (tmp_path / "out").rglob("*") if p.is_file()}
     assert kept == {"bgmatte_app/a.py"}
+
+
+def test_requirements_files_are_ascii_so_pip_works_on_korean_windows():
+    # 한국어 윈도우의 pip는 기본으로 cp949로 읽으므로 한글(UTF-8) 주석이 있으면 설치가 멈춥니다.
+    root = PKG.parent
+    for name in ("requirements.txt", "requirements-app.txt"):
+        (root / name).read_bytes().decode("ascii")
+
+
+def test_batch_files_force_utf8_mode():
+    for rel in ("make_offline_pack.bat", "packaging/install_offline.bat"):
+        assert "PYTHONUTF8=1" in (PKG.parent / rel).read_text(encoding="utf-8"), rel

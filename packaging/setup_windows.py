@@ -235,7 +235,8 @@ def copy_weights_offline(pack: Path, models: Path, minimal: bool = False) -> Lis
 # ------------------------------------------------------------------ pip / torch
 def pip(*args: str, check: bool = True) -> int:
     cmd = [sys.executable, "-m", "pip", *args]
-    return subprocess.run(cmd, check=check).returncode
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}  # 한국어 윈도우(cp949)에서도 안전하게
+    return subprocess.run(cmd, check=check, env=env).returncode
 
 
 def has_nvidia_gpu() -> bool:
