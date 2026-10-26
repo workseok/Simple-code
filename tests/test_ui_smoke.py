@@ -152,20 +152,27 @@ def test_starts_and_shows_running_state(harness):
     assert [w.steps._labels[i].property("step") for i in range(4)] == ["done"] * 4
     assert [b.isEnabled() for b in w.bus._buttons] == [True] * 3 + [False] * 6
     assert w.bus._buttons[0].property("current") is True
-    assert w.val_device.text() == "CPU" and w.val_resolution.text() == "64×48"
+    assert w._device == "CPU" and w._resolution == "64×48"
+    assert "CPU" in w.btn_fps.toolTip() and "64×48" in w.btn_fps.toolTip()
     assert w.btn_toggle.text() == "정지" and w.btn_capture.isEnabled()
     assert w.bg_count.text() == "3개 중 1번"
 
 
-def test_shortcut_list_is_shown_in_panel(harness):
+def test_shortcut_list_is_a_popup_opened_on_demand(harness):
     h = harness()
-    texts = {label.text() for label in h.window.side.findChildren(type(h.window.bg_name)) if label.text()}
-    for needle in ("배경 번호로 바로 전환", "빈 배경 촬영 (촬영 중에는 취소)",
+    w = h.window
+    w.show()
+    h.qapp.processEvents()
+    assert not w._shortcuts_dialog.isVisible(), "단축키 창은 평소에 보이지 않습니다"
+    w.btn_shortcuts.click()
+    assert w._shortcuts_dialog.isVisible()
+    labels = {l.text() for l in w._shortcuts_dialog.findChildren(type(w.bg_name)) if l.text()}
+    for needle in ("합성 배경 번호로 바로 전환", "빈 배경 촬영 (촬영 중에는 취소)",
                    "알파 매트 함께 보기", "전체 화면", "사용 안내"):
-        assert needle in texts, needle
-    assert "이전 / 다음 배경" not in texts, "방향키 안내는 없어졌습니다"
-    caps = {label.text() for label in h.window.side.findChildren(type(h.window.bg_name))}
-    assert "Space" in caps and "B" not in caps and "←" not in caps
+        assert needle in labels, needle
+    assert "Space" in labels and "←" not in labels
+    h.key(Qt.Key.Key_K)  # 다시 누르면 닫힘
+    assert not w._shortcuts_dialog.isVisible()
 
 
 # ---------------------------------------------------------------- 배경 번호
@@ -218,13 +225,13 @@ def test_last_background_is_remembered_on_close(harness):
     assert h.saved and h.saved[-1] == 2
 
 
-def test_alpha_key_toggles_status_text(harness):
+def test_alpha_key_toggles_alpha_state(harness):
     h = harness()
     h.start_running()
     h.key(Qt.Key.Key_A)
-    assert h.until(lambda: h.window.val_alpha.text().startswith("켜짐"))
+    assert h.until(lambda: h.window._alpha is True)
     h.key(Qt.Key.Key_A)
-    assert h.until(lambda: h.window.val_alpha.text() == "꺼짐")
+    assert h.until(lambda: h.window._alpha is False)
 
 
 # ---------------------------------------------------------------- 빈 배경 촬영
@@ -494,16 +501,21 @@ def test_control_buttons_sit_below_the_preview(harness):
     top = lambda widget: widget.mapTo(w, widget.rect().topLeft()).y()  # noqa: E731
     assert top(w.btn_toggle) >= w.preview.mapTo(w, w.preview.rect().bottomLeft()).y()
     assert top(w.btn_capture) == top(w.btn_toggle) == top(w.btn_settings)
-    assert not w.side.isAncestorOf(w.btn_toggle), "오른쪽 패널에는 더 이상 버튼이 없어야 합니다"
+    assert not hasattr(w, "side"), "오른쪽 패널은 없어졌습니다"
+    # 합성 배경 번호 줄은 미리보기 아래에 있다
+    assert top(w.bus) >= w.preview.mapTo(w, w.preview.rect().bottomLeft()).y()
 
 
-def test_info_sections_use_smaller_text_than_the_background_section(harness):
+def test_preview_keeps_16_9_at_any_window_size(harness):
     h = harness()
     w = h.window
     w.show()
-    h.qapp.processEvents()
-    assert w.val_fps.font().pixelSize() in (-1, 11) or w.val_fps.fontInfo().pixelSize() <= 11
-    assert w.bg_name.fontInfo().pixelSize() > w.val_fps.fontInfo().pixelSize()
+    for size in ((1180, 860), (1000, 900), (1500, 700), (900, 640)):
+        w.resize(*size)
+        h.qapp.processEvents()
+        pw, ph = w.preview.width(), w.preview.height()
+        assert abs(pw / ph - 16 / 9) < 0.03, (size, pw, ph)
+        assert pw <= w.preview_frame.width() and ph <= w.preview_frame.height()
 
 
 def test_theme_switch_applies_saves_and_recolors(harness):
@@ -576,7 +588,7 @@ def test_engine_without_bgr_disables_capture_and_explains(harness):
     h.window.cfg.engine = "rvm"
     h.window._refresh_engine_view()
     w = h.window
-    assert w.val_engine.text() == "RobustVideoMatting (mobilenetv3)"
+    assert "RobustVideoMatting (mobilenetv3)" in w.btn_fps.toolTip()
     assert "빈 배경 촬영 없이" in w.footnote.text()
     h.start_running()
     assert w._state == "running" and not w.btn_capture.isEnabled()
@@ -588,7 +600,7 @@ def test_engine_without_bgr_disables_capture_and_explains(harness):
 def test_default_engine_keeps_capture_button_and_footnote(harness):
     h = harness()
     w = h.window
-    assert w.val_engine.text() == "BackgroundMattingV2"
+    assert "BackgroundMattingV2" in w.btn_fps.toolTip()
     assert "빈 배경을 촬영한 뒤" in w.footnote.text()
     h.start_running()
     assert w.btn_capture.isEnabled()
@@ -745,64 +757,62 @@ def test_step_bar_is_not_shown_but_errors_still_use_the_banner(harness):
     assert not w.steps.isVisible(), "전체 화면을 다녀와도 다시 나타나지 않습니다"
 
 
-def test_panels_are_visible_by_default(harness):
+def test_bottom_chips_default_and_toggle_persist(harness):
     h = harness()
     w = h.window
-    assert w.panel_status.isVisible() and w.panel_shortcuts.isVisible() and w.panel_history.isVisible()
+    assert w.btn_fps.isChecked() and w.btn_error_popup.isChecked()
+    w.btn_fps.click()
+    assert w.cfg.show_fps is False and h.saved
+    w.btn_error_popup.click()
+    assert w.cfg.error_popup is False
 
 
-def test_settings_can_turn_panels_off_and_on(harness, monkeypatch):
-    from dataclasses import replace
-
+def test_fps_badge_only_when_running_and_switch_on(harness):
     h = harness()
     w = h.window
-    state = {"cfg": None}
-
-    class StubDialog:
-        def __init__(self, cfg, parent=None, camera_probe=None):
-            self.cfg = cfg
-
-        def exec(self):
-            return QDialog.DialogCode.Accepted
-
-        def result_config(self):
-            return replace(self.cfg, **state["cfg"])
-
-    monkeypatch.setattr(mw, "SettingsDialog", StubDialog)
-    state["cfg"] = {"show_status": False, "show_shortcuts": False}
-    w.open_settings()
-    assert not w.panel_status.isVisible() and not w.panel_shortcuts.isVisible()
-    assert w.panel_history.isVisible()
-    assert w.bus.isVisible(), "합성 배경 패널은 항상 보입니다"
-    assert h.saved, "표시 설정도 저장됩니다"
-    state["cfg"] = {"show_history": False, "show_status": True}
-    w.open_settings()
-    assert w.panel_status.isVisible() and not w.panel_history.isVisible()
+    assert w.preview._fps_text == ""
+    h.start_running()
+    w._on_fps(24.0)
+    assert w.preview._fps_text.startswith("24.0 FPS")
+    w.btn_fps.click()
+    assert w.preview._fps_text == ""
+    w.btn_fps.click()
+    assert w.preview._fps_text.startswith("24.0 FPS")
+    w.stop_pipeline()
+    assert h.until(lambda: w.preview._fps_text == "")
 
 
-def test_hidden_history_panel_still_records_and_banner_still_shows_errors(harness):
+def test_log_popup_opens_only_on_error(harness):
     h = harness()
     w = h.window
-    w.cfg.show_history = False
-    w._apply_panel_visibility()
+    w.show()
+    h.qapp.processEvents()
+    assert not w._log_dialog.isVisible()
+    w._add_notice(messages.camera_in_use(1))  # 오류가 아닌 안내
+    assert not w._log_dialog.isVisible()
     w._add_notice(messages.camera_open_failed(0))
-    assert w.history.count() == 1
+    assert w._log_dialog.isVisible() and w._log_dialog.history.count() == 2
+    w._log_dialog.close()
+    w.btn_error_popup.click()  # 끄면 오류가 나도 열리지 않는다
+    w._add_notice(messages.camera_open_failed(0))
+    assert not w._log_dialog.isVisible()
+    assert w.history.count() == 3, "창이 안 떠도 기록은 쌓입니다"
     assert w.banner.isVisible()
+    w.btn_log.click()
+    assert w._log_dialog.isVisible()
 
 
-def test_settings_dialog_has_panel_checkboxes_roundtrip(qapp):
-    dialog = SettingsDialog(Config(show_shortcuts=False))
-    assert dialog.show_status.isChecked() and not dialog.show_shortcuts.isChecked() and dialog.show_history.isChecked()
-    dialog.show_history.setChecked(False)
-    dialog.show_shortcuts.setChecked(True)
+def test_settings_dialog_no_longer_has_panel_checkboxes(qapp):
+    dialog = SettingsDialog(Config(show_fps=False))
+    assert not hasattr(dialog, "show_status")
     out = dialog.result_config()
-    assert (out.show_status, out.show_shortcuts, out.show_history) == (True, True, False)
+    assert out.show_fps is False, "설정 창을 거쳐도 아래 스위치 값이 유지됩니다"
 
 
 def test_panel_flags_survive_save_and_load(tmp_path):
     from bgmatte_app.config import load_config, save_config
 
     path = tmp_path / "c.json"
-    save_config(Config(show_status=False, show_history=False), path)
+    save_config(Config(show_fps=False, error_popup=False), path)
     cfg, warning = load_config(path)
-    assert warning is None and (cfg.show_status, cfg.show_shortcuts, cfg.show_history) == (False, True, False)
+    assert warning is None and (cfg.show_fps, cfg.error_popup) == (False, False)

@@ -290,8 +290,8 @@ class CamRow(QWidget):
         row.setSpacing(3)
         label = QLabel("카메라")
         label.setObjectName("muted")
+        label.setMinimumWidth(64)  # 아래 '합성 배경' 줄과 번호 버튼의 시작 위치를 맞춥니다
         row.addWidget(label)
-        row.addSpacing(4)
         self._buttons: List[QPushButton] = []
         for i in range(self.SLOTS):
             button = QPushButton(str(i))
@@ -315,6 +315,27 @@ class CamRow(QWidget):
 
 
 # ---------------------------------------------------------------- 미리보기
+class AspectFrame(QWidget):
+    """자식 위젯을 가운데에 두고 항상 정해진 가로세로 비율(기본 16:9)로 맞춥니다.
+    창을 어떻게 늘이거나 줄여도 모니터링 화면의 모양이 일정하게 유지됩니다."""
+
+    def __init__(self, child: QWidget, ratio: float = 16 / 9, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.ratio = ratio
+        self.child = child
+        child.setParent(self)
+        child.setMinimumSize(160, 90)
+        self.setMinimumSize(480, 270)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        w, h = self.width(), self.height()
+        cw = min(w, int(h * self.ratio))
+        ch = int(cw / self.ratio)
+        self.child.setGeometry((w - cw) // 2, (h - ch) // 2, cw, ch)
+
+
 class PreviewView(QWidget):
     """카메라/합성 영상을 비율 유지로 그리고, 그 위에 안내 문구·카운트다운·HUD를 얹습니다."""
 
@@ -330,6 +351,7 @@ class PreviewView(QWidget):
         self._countdown: Optional[int] = None
         self._countdown_total = 1
         self._hud = ""
+        self._fps_text = ""
         self._tally: Optional[str] = None
 
     # -- 상태 ---------------------------------------------------------------
@@ -366,6 +388,12 @@ class PreviewView(QWidget):
         self._hud = text
         self.update()
 
+    def set_fps_badge(self, text: str) -> None:
+        """미리보기 오른쪽 위에 작게 띄우는 FPS 표시 (빈 문자열이면 숨김)."""
+        if text != self._fps_text:
+            self._fps_text = text
+            self.update()
+
     # -- 그리기 ---------------------------------------------------------------
     def _image_rect(self) -> QRect:
         box = self.rect().adjusted(self.FRAME, self.FRAME, -self.FRAME, -self.FRAME)
@@ -394,6 +422,8 @@ class PreviewView(QWidget):
 
         if self._hud:
             self._draw_hud(p, image_rect)
+        if self._fps_text:
+            self._draw_badge(p, image_rect, self._fps_text)
 
         if self._tally:
             half = self.FRAME / 2
@@ -464,6 +494,19 @@ class PreviewView(QWidget):
         p.drawText(
             QRect(area.x(), ring.bottom() + 18, area.width(), 28), _CENTER, caption
         )
+
+    def _draw_badge(self, p: QPainter, area: QRect, text: str) -> None:
+        font = QFont(self.font())
+        font.setPixelSize(12)
+        font.setWeight(QFont.Weight.DemiBold)
+        p.setFont(font)
+        w = QFontMetrics(font).horizontalAdvance(text) + 18
+        box = QRect(area.right() - w - 12, area.y() + 12, w, 22)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(0, 0, 0, 140))
+        p.drawRoundedRect(QRectF(box), 4, 4)
+        p.setPen(QColor(theme.ON_MONITOR_TEXT))
+        p.drawText(box, _CENTER, text)
 
     def _draw_hud(self, p: QPainter, area: QRect) -> None:
         font = QFont(self.font())

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
+from datetime import datetime
 from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -14,15 +17,19 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import BACKBONES, DEVICES, ENGINES, MODEL_TYPES, RVM_VARIANTS, Config, resolve_path
+from ..messages import Level, Notice
 from . import theme
 from .widgets import hairline, keycaps
 
@@ -189,6 +196,103 @@ RESOLUTIONS = (
 )
 
 
+# ---------------------------------------------------------------- 단축키 / 알림 기록 (필요할 때만 뜨는 창)
+_PREFS_KEYS = ("⌘", ",") if sys.platform == "darwin" else ("Ctrl", ",")
+SHORTCUTS = (
+    (("1", "–", "9"), "합성 배경 번호로 바로 전환", "brand"),
+    (("Space",), "빈 배경 촬영 (촬영 중에는 취소)", "pink"),
+    (("A",), "알파 매트 함께 보기", "cyan"),
+    (("F",), "전체 화면", "cyan"),
+    (("M",), "모니터 창 추가 (카메라 2대 동시 보기)", "cyan"),
+    (("K",), "이 단축키 창 열기 / 닫기", "cyan"),
+    (("H",), "사용 안내", "cyan"),
+    (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료", "amber"),
+    (_PREFS_KEYS, "설정", ""),
+)
+
+HISTORY_LIMIT = 50
+LEVEL_COLOR = {
+    Level.INFO: "MUTED",
+    Level.SUCCESS: "LIVE",
+    Level.WARN: "WAIT",
+    Level.ERROR: "STOP",
+}
+
+
+class ShortcutsDialog(QDialog):
+    """단축키 목록. 사용자가 원할 때만(버튼 또는 K) 띄우는 작은 창입니다."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setWindowTitle("단축키")
+        self.setModal(False)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(22, 18, 22, 16)
+        root.setSpacing(12)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(8)
+        for r, (caps, text, tone) in enumerate(SHORTCUTS):
+            grid.addWidget(keycaps(*caps, height=22, tone=tone), r, 0, Qt.AlignmentFlag.AlignVCenter)
+            label = QLabel(text)
+            grid.addWidget(label, r, 1, Qt.AlignmentFlag.AlignVCenter)
+        grid.setColumnMinimumWidth(0, 96)
+        grid.setColumnStretch(1, 1)
+        root.addLayout(grid)
+        close = QPushButton("닫기")
+        close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        close.clicked.connect(self.close)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(close)
+        root.addLayout(row)
+
+
+class NoticeLogDialog(QDialog):
+    """알림 기록. 오류가 생기면 저절로 열리고(끌 수 있음), 평소에는 버튼으로만 엽니다."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setWindowTitle("알림 기록")
+        self.setModal(False)
+        self.resize(480, 340)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 16, 18, 14)
+        root.setSpacing(10)
+        self.history = QListWidget()
+        self.history.setObjectName("history")
+        self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.history.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        root.addWidget(self.history, 1)
+        note = QLabel("오류가 생기면 이 창이 저절로 열립니다. 화면 아래 '오류 팝업'으로 끌 수 있습니다.")
+        note.setObjectName("faint")
+        note.setWordWrap(True)
+        root.addWidget(note)
+        row = QHBoxLayout()
+        clear = QPushButton("지우기")
+        clear.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        clear.clicked.connect(self.history.clear)
+        close = QPushButton("닫기")
+        close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        close.clicked.connect(self.close)
+        row.addWidget(clear)
+        row.addStretch(1)
+        row.addWidget(close)
+        root.addLayout(row)
+
+    def add(self, notice: Notice) -> None:
+        item = QListWidgetItem(f"{datetime.now():%H:%M:%S}   {notice.title}")
+        item.setData(Qt.ItemDataRole.UserRole, LEVEL_COLOR[notice.level])
+        item.setForeground(QColor(theme.color(LEVEL_COLOR[notice.level])))
+        tip = "\n".join(part for part in (notice.detail, notice.hint) if part)
+        if tip:
+            item.setToolTip(tip)
+        self.history.insertItem(0, item)
+        while self.history.count() > HISTORY_LIMIT:
+            self.history.takeItem(self.history.count() - 1)
+
+
+
 def probe_cameras(max_index: int = 5) -> List[Tuple[int, bool, str]]:
     """카메라 번호 0..max_index-1을 열어 보고 (번호, 열림 여부, 해상도) 목록을 반환합니다."""
     from ..camera import open_capture
@@ -346,19 +450,6 @@ class SettingsDialog(QDialog):
         form.addRow("RVM 옵션", rvm_opts)
         self._engine_rows["rvm"] += [self.rvm_repo, rvm_opts]
 
-        # 화면 표시: 오른쪽 콘솔의 보조 패널을 켜고 끕니다 (합성 배경 패널은 항상 보임)
-        panels = QVBoxLayout()
-        panels.setSpacing(6)
-        self.show_status = QCheckBox("상태 (엔진·처리 장치·해상도·속도)")
-        self.show_shortcuts = QCheckBox("단축키 안내")
-        self.show_history = QCheckBox("알림 기록")
-        for box, value in ((self.show_status, cfg.show_status), (self.show_shortcuts, cfg.show_shortcuts),
-                           (self.show_history, cfg.show_history)):
-            box.setChecked(value)
-            box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            panels.addWidget(box)
-        form.addRow("화면 표시", panels)
-
         self._form = form
         self.engine.currentIndexChanged.connect(self._apply_engine_visibility)
         self._apply_engine_visibility()
@@ -423,7 +514,4 @@ class SettingsDialog(QDialog):
             backbone=self.backbone.currentText(),
             model_type=self.model_type.currentText(),
             device=self.device.currentText(),
-            show_status=self.show_status.isChecked(),
-            show_shortcuts=self.show_shortcuts.isChecked(),
-            show_history=self.show_history.isChecked(),
         ).validated()

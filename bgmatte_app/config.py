@@ -91,10 +91,9 @@ class Config:
     last_background: int = 1
     seen_intro: bool = False
     theme: str = "dark"  # 화면 테마: dark(어둡게) | light(밝게)
-    # 오른쪽 콘솔의 보조 패널 표시 여부 (설정 → 화면 표시). 합성 배경 패널은 항상 보입니다.
-    show_status: bool = True
-    show_shortcuts: bool = True
-    show_history: bool = True
+    # 화면 아래쪽 스위치: 미리보기 모서리의 FPS 표시, 오류가 생겼을 때 알림 기록 창 자동 열기
+    show_fps: bool = True
+    error_popup: bool = True
 
     def resolve(self, value: str) -> Path:
         return resolve_path(value)

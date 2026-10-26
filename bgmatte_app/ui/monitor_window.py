@@ -22,7 +22,7 @@ from ..messages import Level, Notice
 from ..worker import PipelineWorker
 from . import theme
 from .main_window import LEVEL_COLOR, STATE_VIEW, STEP_HINT, TALLY, _Bridge
-from .widgets import BusRow, CamRow, PreviewView, repolish
+from .widgets import AspectFrame, BusRow, CamRow, PreviewView, repolish
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,8 @@ class MonitorWindow(QMainWindow):
         col.setSpacing(8)
 
         self.preview = PreviewView()
-        col.addWidget(self.preview, 1)
+        self.preview_frame = AspectFrame(self.preview)
+        col.addWidget(self.preview_frame, 1)
 
         self.controls = QWidget()
         self.controls.setObjectName("console")

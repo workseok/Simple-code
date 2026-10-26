@@ -235,6 +235,14 @@ QPushButton#seg:checked {{ background: {p.BRAND}; color: {p.ON_PRIMARY}; border-
 QPushButton#seg[pos="left"] {{ border-top-right-radius: 0; border-bottom-right-radius: 0; }}
 QPushButton#seg[pos="right"] {{ border-top-left-radius: 0; border-bottom-left-radius: 0; }}
 
+/* 화면 아래의 작은 스위치/버튼 (FPS · 오류 팝업 · 단축키 · 알림 기록) */
+QPushButton#chip {{
+    padding: 4px 11px; font-size: 12px; color: {p.MUTED};
+    background: {p.SURFACE}; border: 1px solid {p.HAIRLINE}; border-radius: 12px;
+}}
+QPushButton#chip:hover {{ background: {p.SURFACE_HOVER}; color: {p.TEXT}; }}
+QPushButton#chip:checked {{ background: {p.BRAND}; color: {p.ON_PRIMARY}; border-color: {p.BRAND}; font-weight: 700; }}
+
 /* 배경 번호 버튼: 스위처처럼 번호마다 아래쪽에 색이 칠해져 있고, 사용 중인 번호만 초록으로 켜집니다 */
 QPushButton#bus {{
     padding: 0; min-width: 29px; max-width: 29px; min-height: 38px; max-height: 38px;

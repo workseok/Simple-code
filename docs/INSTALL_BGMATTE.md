@@ -94,7 +94,7 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
 
 ## 5. 설치가 되었는지 확인
 
-- 앱 상태 패널의 **처리 장치**가 NVIDIA 환경이면 `CUDA`, 아니면 `CPU`(Mac은 `MPS`)로 표시되는지 확인
+- 아래쪽 **FPS** 버튼에 마우스를 올렸을 때 '장치'가 NVIDIA 환경이면 `CUDA`, 아니면 `CPU`(Mac은 `MPS`)로 표시되는지 확인
 - 로그: Windows `%LOCALAPPDATA%\BGMatte\app.log`, 설정: `%APPDATA%\BGMatte\config.json`
 - 문제 해결 표: [APP_WINDOWS.md](APP_WINDOWS.md) 5장
 

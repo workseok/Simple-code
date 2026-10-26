@@ -1,4 +1,4 @@
-"""메인 창: 미리보기 + 단계 표시 + 알림 배너 + 오른쪽 콘솔(배경 번호·상태·단축키·알림 기록)."""
+"""메인 창: 16:9 미리보기 + 알림 배너 + 아래쪽 줄(카메라·합성 배경·버튼·스위치). 단축키/알림 기록은 필요할 때만 뜨는 창."""
 
 from __future__ import annotations
 
@@ -15,14 +15,11 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QPushButton,
-    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -33,10 +30,10 @@ from ..config import APP_NAME, Config, save_config
 from ..messages import Level, Notice
 from ..worker import PipelineWorker
 from . import theme
-from .dialogs import IntroDialog, SettingsDialog, probe_cameras
-from .widgets import (
-    BusRow, CamRow, NoticeBanner, PreviewView, StepBar, TallyDot, app_icon_pixmap, keycaps, repolish, section_header,
+from .dialogs import (
+    HISTORY_LIMIT, LEVEL_COLOR, SHORTCUTS, IntroDialog, NoticeLogDialog, SettingsDialog, ShortcutsDialog, probe_cameras,
 )
+from .widgets import AspectFrame, BusRow, CamRow, NoticeBanner, PreviewView, StepBar, TallyDot, app_icon_pixmap, repolish
 
 log = logging.getLogger(__name__)
 
@@ -68,26 +65,6 @@ STEP_HINT = (
     "합성을 시작하는 중입니다.",
 )
 
-LEVEL_COLOR = {
-    Level.INFO: "MUTED",
-    Level.SUCCESS: "LIVE",
-    Level.WARN: "WAIT",
-    Level.ERROR: "STOP",
-}
-
-_PREFS_KEYS = ("⌘", ",") if sys.platform == "darwin" else ("Ctrl", ",")
-SHORTCUTS = (
-    (("1", "–", "9"), "배경 번호로 바로 전환", "brand"),
-    (("Space",), "빈 배경 촬영 (촬영 중에는 취소)", "pink"),
-    (("A",), "알파 매트 함께 보기", "cyan"),
-    (("F",), "전체 화면", "cyan"),
-    (("M",), "모니터 창 추가 (카메라 2대 동시 보기)", "cyan"),
-    (("H",), "사용 안내", "cyan"),
-    (("Esc",), "촬영 취소 · 전체 화면 해제 · 종료", "amber"),
-    (_PREFS_KEYS, "설정", ""),
-)
-
-HISTORY_LIMIT = 50
 # 배너가 '빈 배경을 촬영하세요'를 안내하는 동안에는 미리보기 카드로 같은 말을 반복하지 않는다
 WAITING_PROMPTS = {"bgr_missing", "bgr_unreadable"}
 # 촬영이 시작되면 더는 필요 없는 안내
@@ -197,10 +174,12 @@ class MainWindow(QMainWindow):
         self._current_bg = 0
         self._fps = 0.0
         self._alpha = False
+        self._device = ""
+        self._resolution = ""
 
         self.setWindowTitle(f"{APP_NAME} {__version__}")
-        self.resize(1240, 820)
-        self.setMinimumSize(1000, 660)
+        self.resize(1180, 860)
+        self.setMinimumSize(900, 640)
         theme.set_theme(self.cfg.theme)
         self._build_ui()
         self._apply_theme()
@@ -218,25 +197,56 @@ class MainWindow(QMainWindow):
         central = QWidget()
         central.setObjectName("console")
         self.setCentralWidget(central)
-        root = QHBoxLayout(central)
-        root.setContentsMargins(18, 16, 18, 16)
-        root.setSpacing(20)
+        root = QVBoxLayout(central)
+        root.setContentsMargins(18, 12, 18, 14)
+        root.setSpacing(10)
 
-        # ---- 왼쪽: 단계 / 배너 / 미리보기
-        left = QVBoxLayout()
-        left.setSpacing(10)
-        # 상단 '카메라-배경-모델-합성' 진행 표시는 보이지 않게 합니다 (준비 단계 안내는 미리보기 위 문구로 대신).
-        # 단계 상태를 기록하는 객체는 그대로 두어서 워커 이벤트 처리 코드는 바뀌지 않습니다.
+        # ---- 맨 위 한 줄: 로고 · 상태 · 화면 색
+        self.topbar = QWidget()
+        self.topbar.setObjectName("console")
+        header = QHBoxLayout(self.topbar)
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(8)
+        logo = QLabel()
+        logo.setPixmap(app_icon_pixmap(28))
+        logo.setFixedSize(28, 28)
+        header.addWidget(logo)
+        title = QLabel(APP_NAME)
+        title.setObjectName("appTitle")
+        header.addWidget(title)
+        header.addSpacing(10)
+        self.tally = TallyDot()
+        self.status_label = QLabel()
+        header.addWidget(self.tally)
+        header.addWidget(self.status_label)
+        header.addStretch(1)
+        header.addLayout(self._build_theme_switch())
+        root.addWidget(self.topbar)
+        self.accent = QFrame()
+        self.accent.setObjectName("accentLine")
+        root.addWidget(self.accent)
+
+        # ---- 오류 안내 배너 (상단 '카메라-배경-모델-합성' 표시줄은 보이지 않게 둠: 상태만 기록하는 숨은 객체)
         self.steps = StepBar()
         self.steps.hide()
         self.banner = NoticeBanner(ACTION_LABELS)
         self.banner.action_requested.connect(self._on_action)
         self.banner.cleared.connect(self._refresh_overlay)
-        self.preview = PreviewView()
-        left.addWidget(self.banner)
-        left.addWidget(self.preview, 1)
+        root.addWidget(self.banner)
 
-        # 미리보기 바로 아래: 카메라 번호 버튼과 모니터 창 추가 버튼
+        # ---- 미리보기: 창 크기와 상관없이 항상 16:9
+        self.preview = PreviewView()
+        self.preview_frame = AspectFrame(self.preview)
+        root.addWidget(self.preview_frame, 1)
+
+        # ---- 아래쪽: 카메라 번호 / 합성 배경 번호 / 버튼과 스위치
+        self.bottom = QWidget()
+        self.bottom.setObjectName("console")
+        rows = QVBoxLayout(self.bottom)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(8)
+
+        # 줄 1: 카메라 번호 + 모니터 창 추가
         self.camera_bar = QWidget()
         self.camera_bar.setObjectName("console")
         cam_line = QHBoxLayout(self.camera_bar)
@@ -252,9 +262,38 @@ class MainWindow(QMainWindow):
         self.btn_monitor.setToolTip("다른 카메라의 실시간 합성 영상을 별도 창으로 띄웁니다 (M)")
         self.btn_monitor.clicked.connect(self.open_monitor)
         cam_line.addWidget(self.btn_monitor)
-        left.addWidget(self.camera_bar)
+        rows.addWidget(self.camera_bar)
 
-        # 그 아래: 시작/정지, 배경 촬영, 설정 버튼과 안내 한 줄
+        # 줄 2: 합성 배경 번호
+        self.bg_bar = QWidget()
+        self.bg_bar.setObjectName("console")
+        bg_line = QHBoxLayout(self.bg_bar)
+        bg_line.setContentsMargins(0, 0, 0, 0)
+        bg_line.setSpacing(3)
+        bg_label = QLabel("합성 배경")
+        bg_label.setObjectName("muted")
+        bg_label.setMinimumWidth(64)
+        bg_line.addWidget(bg_label)
+        self.bus = BusRow()
+        self.bus.chosen.connect(self.select_background)
+        bg_line.addWidget(self.bus)
+        bg_line.addSpacing(12)
+        self.bg_name = QLabel("")
+        self.bg_name.setObjectName("bgName")
+        self.bg_name.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        bg_line.addWidget(self.bg_name, 1)
+        self.bg_count = QLabel("")
+        self.bg_count.setObjectName("muted")
+        bg_line.addWidget(self.bg_count)
+        bg_line.addSpacing(8)
+        self.btn_folder = QPushButton("폴더 열기")
+        self.btn_folder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_folder.setStyleSheet("padding: 3px 10px; font-size: 12px;")
+        self.btn_folder.clicked.connect(lambda: self._on_action("open_backgrounds"))
+        bg_line.addWidget(self.btn_folder)
+        rows.addWidget(self.bg_bar)
+
+        # 줄 3: 시작/정지 · 배경 촬영 · 설정 · 안내 한 줄 · 스위치들
         self.controls = QWidget()
         self.controls.setObjectName("console")
         bar = QHBoxLayout(self.controls)
@@ -272,149 +311,68 @@ class MainWindow(QMainWindow):
         self.btn_toggle.clicked.connect(self.toggle_pipeline)
         self.btn_capture.clicked.connect(self.toggle_capture)
         self.btn_settings.clicked.connect(self.open_settings)
-        bar.addStretch(1)
+        bar.addSpacing(8)
         self.footnote = QLabel("카메라는 빈 배경을 촬영한 뒤 움직이지 마세요.")
         self.footnote.setObjectName("faint")
-        bar.addWidget(self.footnote)
-        left.addWidget(self.controls)
-        root.addLayout(left, 1)
+        self.footnote.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        bar.addWidget(self.footnote, 1)
 
-        # ---- 오른쪽: 콘솔
-        self.side = QWidget()
-        self.side.setFixedWidth(350)
-        side = QVBoxLayout(self.side)
-        side.setContentsMargins(0, 0, 0, 0)
-        side.setSpacing(8)
+        self.btn_fps = self._make_chip("FPS", checkable=True)
+        self.btn_fps.setChecked(self.cfg.show_fps)
+        self.btn_fps.toggled.connect(self.set_show_fps)
+        self.btn_error_popup = self._make_chip("오류 팝업", checkable=True)
+        self.btn_error_popup.setChecked(self.cfg.error_popup)
+        self.btn_error_popup.setToolTip("켜 두면 오류가 생겼을 때 알림 기록 창이 저절로 열립니다")
+        self.btn_error_popup.toggled.connect(self.set_error_popup)
+        self.btn_log = self._make_chip("알림 기록")
+        self.btn_log.clicked.connect(lambda: self.show_log(activate=True))
+        self.btn_shortcuts = self._make_chip("단축키")
+        self.btn_shortcuts.setToolTip("단축키 안내를 열고 닫습니다 (K)")
+        self.btn_shortcuts.clicked.connect(self.toggle_shortcuts)
+        for chip in (self.btn_fps, self.btn_error_popup, self.btn_log, self.btn_shortcuts):
+            bar.addWidget(chip)
+        rows.addWidget(self.controls)
+        root.addWidget(self.bottom)
 
-        header = QHBoxLayout()
-        header.setSpacing(8)
-        logo = QLabel()
-        logo.setPixmap(app_icon_pixmap(28))
-        logo.setFixedSize(28, 28)
-        header.addWidget(logo)
-        title = QLabel(APP_NAME)
-        title.setObjectName("appTitle")
-        header.addWidget(title)
-        header.addStretch(1)
-        header.addLayout(self._build_theme_switch())
-        header.addSpacing(6)
-        self.tally = TallyDot()
-        self.status_label = QLabel()
-        header.addWidget(self.tally)
-        header.addWidget(self.status_label)
-        side.addLayout(header)
-        accent = QFrame()
-        accent.setObjectName("accentLine")
-        side.addWidget(accent)
+        # 필요할 때만 뜨는 창들 (처음에는 만들어 두기만 하고 보이지 않음)
+        self._log_dialog = NoticeLogDialog(self)
+        self.history = self._log_dialog.history
+        self._shortcuts_dialog = ShortcutsDialog(self)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        body = QWidget()
-        body.setObjectName("console")
-        body_col = QVBoxLayout(body)
-        body_col.setContentsMargins(0, 4, 8, 0)
-        body_col.setSpacing(10)
+    @staticmethod
+    def _make_chip(text: str, checkable: bool = False) -> QPushButton:
+        chip = QPushButton(text)
+        chip.setObjectName("chip")
+        chip.setCheckable(checkable)
+        chip.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        return chip
 
-        def make_panel(title_text: str, tone: str, compact: bool):
-            frame = QFrame()
-            frame.setObjectName("panel")
-            outer = QVBoxLayout(frame)
-            outer.setContentsMargins(0, 0, 0, 0)
-            inner = QWidget()
-            if compact:  # 상태 · 단축키 · 알림 기록은 보조 정보라서 작은 글씨로 표시합니다.
-                inner.setObjectName("compact")
-            lay = QVBoxLayout(inner)
-            lay.setContentsMargins(12, 10, 12, 12)
-            lay.setSpacing(8)
-            head = section_header(title_text, tone)
-            lay.addLayout(head)
-            outer.addWidget(inner)
-            body_col.addWidget(frame)
-            self._last_panel = frame
-            return lay, head
+    def set_show_fps(self, on: bool) -> None:
+        self.cfg.show_fps = on
+        self._refresh_fps()
+        self._persist()
 
-        # 합성 배경
-        col, head = make_panel("합성 배경", "brand", compact=False)
-        self.bg_count = QLabel("")
-        self.bg_count.setObjectName("muted")
-        head.addWidget(self.bg_count)
-        head.addStretch(1)
-        self.btn_folder = QPushButton("폴더 열기")
-        self.btn_folder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.btn_folder.setStyleSheet("padding: 3px 10px; font-size: 12px;")
-        self.btn_folder.clicked.connect(lambda: self._on_action("open_backgrounds"))
-        head.addWidget(self.btn_folder)
-        self.bus = BusRow()
-        self.bus.chosen.connect(self.select_background)
-        col.addWidget(self.bus)
-        self.bg_name = QLabel("")
-        self.bg_name.setObjectName("bgName")
-        self.bg_note = QLabel("")
-        self.bg_note.setObjectName("faint")
-        self.bg_note.setWordWrap(True)
-        col.addWidget(self.bg_name)
-        col.addWidget(self.bg_note)
+    def set_error_popup(self, on: bool) -> None:
+        self.cfg.error_popup = on
+        self._persist()
 
-        # 상태
-        col, _ = make_panel("상태", "cyan", compact=True)
-        self.panel_status = self._last_panel
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(3)
-        self.val_engine = QLabel("—")
-        self.val_device = QLabel("—")
-        self.val_resolution = QLabel("—")
-        self.val_fps = QLabel("—")
-        self.val_fps.setObjectName("fpsValue")
-        self.val_alpha = QLabel("꺼짐")
-        for r, (name, value) in enumerate(
-            (("엔진", self.val_engine), ("처리 장치", self.val_device), ("해상도", self.val_resolution),
-             ("속도", self.val_fps), ("알파 보기", self.val_alpha))
-        ):
-            label = QLabel(name)
-            label.setObjectName("muted")
-            grid.addWidget(label, r, 0)
-            grid.addWidget(value, r, 1)
-        grid.setColumnStretch(1, 1)
-        col.addLayout(grid)
+    def toggle_shortcuts(self) -> None:
+        dialog = self._shortcuts_dialog
+        if dialog.isVisible():
+            dialog.close()
+        else:
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
 
-        # 단축키 (키 역할별로 색을 나눔: 배경 번호=보라, 촬영=분홍, 보기=청록, 종료=노랑)
-        col, _ = make_panel("단축키", "amber", compact=True)
-        self.panel_shortcuts = self._last_panel
-        keys = QGridLayout()
-        keys.setHorizontalSpacing(12)
-        keys.setVerticalSpacing(4)
-        for r, (caps, text, tone) in enumerate(SHORTCUTS):
-            keys.addWidget(keycaps(*caps, height=18, tone=tone), r, 0, Qt.AlignmentFlag.AlignVCenter)
-            label = QLabel(text)
-            label.setWordWrap(True)
-            keys.addWidget(label, r, 1, Qt.AlignmentFlag.AlignVCenter)
-        keys.setColumnMinimumWidth(0, 78)
-        keys.setColumnStretch(1, 1)
-        col.addLayout(keys)
-
-        # 알림 기록
-        col, _ = make_panel("알림 기록", "pink", compact=True)
-        self.panel_history = self._last_panel
-        self.history = QListWidget()
-        self.history.setObjectName("history")
-        self.history.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.history.setMinimumHeight(84)
-        self.history.setSelectionMode(QListWidget.SelectionMode.NoSelection)
-        col.addWidget(self.history)
-        body_col.addStretch(1)
-
-        scroll.setWidget(body)
-        side.addWidget(scroll, 1)
-        root.addWidget(self.side)
-        self._apply_panel_visibility()
-
-    def _apply_panel_visibility(self) -> None:
-        """설정 → 화면 표시에서 고른 대로 상태·단축키·알림 기록 패널을 보이거나 숨깁니다."""
-        self.panel_status.setVisible(self.cfg.show_status)
-        self.panel_shortcuts.setVisible(self.cfg.show_shortcuts)
-        self.panel_history.setVisible(self.cfg.show_history)
+    def show_log(self, activate: bool = False) -> None:
+        """알림 기록 창을 엽니다. 오류로 저절로 열릴 때는 키보드 입력을 가로채지 않습니다."""
+        dialog = self._log_dialog
+        dialog.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, not activate)
+        dialog.show()
+        dialog.raise_()
+        if activate:
+            dialog.activateWindow()
 
     def _build_theme_switch(self) -> QHBoxLayout:
         """헤더의 '어둡게 | 밝게' 선택 버튼."""
@@ -476,6 +434,7 @@ class MainWindow(QMainWindow):
         add("A", self.toggle_alpha)
         add("F", self.toggle_fullscreen)
         add("M", self.open_monitor)
+        add("K", self.toggle_shortcuts)
         add("H", self.show_intro)
         add("Esc", self.on_escape)
         add(QKeySequence.StandardKey.Preferences, self.open_settings)
@@ -662,7 +621,7 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-        for w in (self.side, self.controls, self.camera_bar):
+        for w in (self.topbar, self.accent, self.bottom):
             w.setVisible(not full)
         self._update_hud()
 
@@ -687,7 +646,6 @@ class MainWindow(QMainWindow):
             self._persist()
             self._scan_backgrounds()
             self._refresh_engine_view()
-            self._apply_panel_visibility()
             self.cam_row.set_current(self.cfg.camera_index)
         if was_active or accepted:
             self.start_pipeline()
@@ -722,12 +680,12 @@ class MainWindow(QMainWindow):
             self.preview.clear_frame()
             self.preview.set_countdown(None)
             self._fps = 0.0
-            self.val_fps.setText("—")
         if state in ("starting", "stopped", "error") and self._alpha:
             self._on_alpha(False)
         if state == "capturing" and self.banner.code in CAPTURE_PROMPTS:
             self.banner.clear()
         self.preview.set_tally(TALLY.get(state))
+        self._refresh_fps()
         self._refresh_overlay()
         self._refresh_buttons()
         self._update_hud()
@@ -746,24 +704,42 @@ class MainWindow(QMainWindow):
 
     def _on_fps(self, fps: float) -> None:
         self._fps = fps
-        self.val_fps.setText(f"{fps:.1f} FPS")
+        self._refresh_fps()
         self._update_hud()
 
     def _on_info(self, device: str, resolution: str) -> None:
         if device:
-            self.val_device.setText(device)
-            self.val_device.setToolTip(
-                "GPU를 쓸 수 없어 CPU로 처리합니다. 속도가 느릴 수 있습니다." if device.startswith("CPU") else ""
-            )
+            self._device = device
         if resolution:
-            self.val_resolution.setText(resolution)
+            self._resolution = resolution
+        self._refresh_fps_tip()
+
+    def _refresh_fps(self) -> None:
+        """미리보기 오른쪽 위 모서리의 FPS 표시. 실행 중이고 스위치가 켜져 있을 때만 보입니다."""
+        if self.cfg.show_fps and self._state in ("running", "capturing") and self._fps > 0:
+            text = f"{self._fps:.1f} FPS" + (" · 알파" if self._alpha else "")
+        else:
+            text = ""
+        self.preview.set_fps_badge(text)
+
+    def _refresh_fps_tip(self) -> None:
+        name = messages.ENGINE_NAMES.get(self.cfg.engine, self.cfg.engine)
+        if self.cfg.engine == "rvm":
+            name += f" ({self.cfg.rvm_variant})"
+        lines = [f"엔진: {name}"]
+        if self._device:
+            lines.append(f"장치: {self._device}" + (" — GPU를 쓸 수 없어 느릴 수 있습니다" if self._device.startswith("CPU") else ""))
+        if self._resolution:
+            lines.append(f"해상도: {self._resolution}")
+        lines.append("미리보기 오른쪽 위에 FPS를 표시합니다")
+        self.btn_fps.setToolTip("\n".join(lines))
 
     def _on_tick(self, value: int) -> None:
         self.preview.set_countdown(None if value < 0 else value, self.cfg.countdown_seconds)
 
     def _on_alpha(self, enabled: bool) -> None:
         self._alpha = enabled
-        self.val_alpha.setText("켜짐 (오른쪽에 알파 매트 표시)" if enabled else "꺼짐")
+        self._refresh_fps()
 
     # ================================================================ 화면 갱신
     def _refresh_overlay(self) -> None:
@@ -787,10 +763,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_engine_view(self) -> None:
         """선택한 엔진 이름과, 엔진에 따라 달라지는 안내 문구(빈 배경 촬영 필요 여부)를 갱신합니다."""
-        name = messages.ENGINE_NAMES.get(self.cfg.engine, self.cfg.engine)
-        if self.cfg.engine == "rvm":
-            name += f" ({self.cfg.rvm_variant})"
-        self.val_engine.setText(name)
+        self._refresh_fps_tip()
         self.footnote.setText(
             "카메라는 빈 배경을 촬영한 뒤 움직이지 마세요." if self.cfg.needs_bgr
             else "이 엔진은 빈 배경 촬영 없이 바로 합성합니다."
@@ -834,7 +807,7 @@ class MainWindow(QMainWindow):
             self.bus.set_current(0)
             self.bg_count.setText("")
             self.bg_name.setText("배경 이미지가 없습니다")
-            self.bg_note.setText("‘폴더 열기’로 backgrounds 폴더를 열고 PNG/JPG 파일을 넣어 주세요.")
+            self.bg_name.setToolTip("‘폴더 열기’로 backgrounds 폴더를 열고 PNG/JPG 파일을 넣어 주세요.")
             return
         number = min(max(self.cfg.last_background, 1), count)
         self._current_bg = number
@@ -846,22 +819,15 @@ class MainWindow(QMainWindow):
         fm = QFontMetrics(self.bg_name.font())
         self.bg_name.setText(fm.elidedText(name, Qt.TextElideMode.ElideMiddle, 340))
         self.bg_name.setToolTip(name)
-        notes = []
-        if count > BusRow.SLOTS:
-            notes.append(f"{BusRow.SLOTS}개까지만 선택할 수 있습니다. {BusRow.SLOTS + 1}번부터는 쓰이지 않습니다.")
-        self.bg_note.setText(" ".join(notes))
-        self.bg_note.setVisible(bool(notes))
+        self.bg_count.setToolTip(
+            f"{BusRow.SLOTS}개까지만 선택할 수 있습니다. {BusRow.SLOTS + 1}번부터는 쓰이지 않습니다."
+            if count > BusRow.SLOTS else ""
+        )
 
     def _add_notice(self, notice: Notice) -> None:
-        item = QListWidgetItem(f"{datetime.now():%H:%M:%S}   {notice.title}")
-        item.setData(Qt.ItemDataRole.UserRole, LEVEL_COLOR[notice.level])
-        item.setForeground(QColor(theme.color(LEVEL_COLOR[notice.level])))
-        tip = "\n".join(part for part in (notice.detail, notice.hint) if part)
-        if tip:
-            item.setToolTip(tip)
-        self.history.insertItem(0, item)
-        while self.history.count() > HISTORY_LIMIT:
-            self.history.takeItem(self.history.count() - 1)
+        self._log_dialog.add(notice)
+        if notice.level == Level.ERROR and self.cfg.error_popup:
+            self.show_log()  # 오류일 때만 저절로 열림 (포커스는 가져가지 않음)
         if notice.banner:
             self.banner.show_notice(notice)
             self._refresh_overlay()
@@ -876,6 +842,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         for monitor in list(self._monitors):
             monitor.close()
+        self._log_dialog.close()
+        self._shortcuts_dialog.close()
         self._persist()
         self._awaiting_permission = False
         workers = list(self._retiring)
