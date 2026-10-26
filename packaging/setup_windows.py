@@ -15,6 +15,8 @@
   --all-weights   예전 옵션 (이제는 기본 동작이라 아무 일도 하지 않습니다)
   --cpu           NVIDIA GPU가 있어도 CPU용 PyTorch로 설치
   --skip-torch    PyTorch 설치 단계를 건너뛰기
+  --offline-dir D 인터넷 없이 설치: D(오프라인 팩의 offline 폴더)의 wheels / repos / models 만 사용합니다.
+                  (오프라인 팩은 packaging/build_offline_pack.py 로 인터넷 되는 PC에서 만듭니다. docs/OFFLINE_PACK.md)
 """
 
 from __future__ import annotations
@@ -156,6 +158,80 @@ def extract_single_root(archive: Path, dest: Path) -> None:
         shutil.copytree(source, dest, dirs_exist_ok=True)
 
 
+# ------------------------------------------------------------------ 오프라인 팩에서 설치
+def pack_problems(pack: Path) -> List[str]:
+    """오프라인 팩(offline 폴더)에 빠진 것이 있으면 이름 목록을 돌려줍니다 (비어 있으면 설치 가능)."""
+    missing: List[str] = []
+    wheels = pack / "wheels"
+    for prefix in ("torch-", "torchvision-"):
+        if not any(wheels.glob(prefix + "*.whl")):
+            missing.append(f"wheels/{prefix}*.whl")
+    for name in REPOS:
+        if not (pack / "repos" / f"{name}.zip").is_file():
+            missing.append(f"repos/{name}.zip")
+    for name, _url, size, _core in WEIGHTS:
+        if not file_ok(pack / "models" / name, size):
+            missing.append(f"models/{name}")
+    return missing
+
+
+def pip_offline(pack: Path, *args: str, check: bool = True) -> int:
+    """인터넷에 접속하지 않고(--no-index) 팩의 wheels 폴더에서만 설치합니다."""
+    return pip("install", "--no-index", "--find-links", str(pack / "wheels"), *args, check=check)
+
+
+def install_torch_offline(pack: Path) -> bool:
+    """팩에 든 PyTorch(CUDA 빌드)를 설치합니다. NVIDIA GPU가 없는 PC에서는 같은 빌드가 CPU로 동작합니다."""
+    pip("uninstall", "-y", "torch", "torchvision", check=False)
+    if pip_offline(pack, "torch", "torchvision", check=False) != 0:
+        say("  ✕ 팩의 PyTorch 설치에 실패했습니다. 팩이 이 PC의 파이썬(3.11, 64비트)과 맞는지 확인해 주세요.")
+        return False
+    gpu = has_nvidia_gpu()
+    ok = cuda_works()
+    if gpu and not ok:
+        say("  · NVIDIA GPU가 보이지만 이 팩의 CUDA 버전으로는 쓸 수 없습니다 (그래픽 드라이버가 오래되었을 수 있습니다).")
+        say("    → NVIDIA 드라이버를 최신으로 올리면 GPU로 동작합니다. 그때까지는 CPU로 동작합니다.")
+    else:
+        say(f"  ✓ PyTorch 설치 완료 ({'GPU(CUDA) 사용 가능' if ok else 'CPU 사용'})")
+    return True
+
+
+def install_repos_offline(pack: Path, parent: Path) -> List[str]:
+    failed: List[str] = []
+    for name in REPOS:
+        dest = parent / name
+        if (dest / "model").is_dir():
+            say(f"  ✓ 이미 있음: {dest}")
+            continue
+        try:
+            extract_single_root(pack / "repos" / f"{name}.zip", dest)
+            say(f"  ✓ 코드 준비: {dest}")
+        except Exception as exc:
+            say(f"  ✕ {name} 코드를 풀지 못했습니다 ({exc})")
+            failed.append(f"{name} 코드")
+    return failed
+
+
+def copy_weights_offline(pack: Path, models: Path, minimal: bool = False) -> List[str]:
+    failed: List[str] = []
+    models.mkdir(parents=True, exist_ok=True)
+    for name, _url, size, core in WEIGHTS:
+        if not (core or not minimal):
+            continue
+        dest = models / name
+        if file_ok(dest, size):
+            say(f"  ✓ 이미 있음: {name}")
+            continue
+        src = pack / "models" / name
+        if not file_ok(src, size):
+            say(f"  ✕ 팩에 없거나 크기가 맞지 않습니다: {name}")
+            failed.append(name)
+            continue
+        shutil.copyfile(src, dest)
+        say(f"  ✓ 복사: {name}")
+    return failed
+
+
 # ------------------------------------------------------------------ pip / torch
 def pip(*args: str, check: bool = True) -> int:
     cmd = [sys.executable, "-m", "pip", *args]
@@ -253,32 +329,54 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--minimal", action="store_true", help="필수 가중치 2종만 받기")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--skip-torch", action="store_true")
+    parser.add_argument("--offline-dir", type=Path, default=None, help="오프라인 팩의 offline 폴더 (인터넷 없이 설치)")
     args = parser.parse_args(argv)
+    pack: Optional[Path] = args.offline_dir
+    if pack is not None:
+        absent = pack_problems(pack)
+        if absent:
+            say("오프라인 팩이 완전하지 않습니다. 빠진 항목: " + ", ".join(absent))
+            say("팩을 만든 PC에서 build_offline_pack.py 를 다시 실행하거나, 복사 중 끊긴 파일이 없는지 확인해 주세요.")
+            return 2
 
     problems: List[str] = []
     models = ROOT / "models"
     models.mkdir(exist_ok=True)
     (ROOT / "backgrounds").mkdir(exist_ok=True)
 
-    say("[1/5] PyTorch")
-    if args.skip_torch or (torch_installed() and not args.cpu and cuda_works() == has_nvidia_gpu()):
+    say("[1/5] PyTorch" + (" (오프라인 팩)" if pack else ""))
+    if pack is not None and not args.skip_torch:
+        if not install_torch_offline(pack):
+            problems.append("PyTorch")
+    elif args.skip_torch or (torch_installed() and not args.cpu and cuda_works() == has_nvidia_gpu()):
         say("  ✓ 이미 설치되어 있어 건너뜁니다")
     else:
         install_torch(args.cpu)
 
     say("\n[2/5] 앱 라이브러리")
-    pip("install", "-r", str(ROOT / "requirements.txt"), "-r", str(ROOT / "requirements-app.txt"))
+    requirements = ("-r", str(ROOT / "requirements.txt"), "-r", str(ROOT / "requirements-app.txt"))
+    if pack is not None:
+        if pip_offline(pack, *requirements, check=False) != 0:
+            problems.append("앱 라이브러리")
+    else:
+        pip("install", *requirements)
 
     say("\n[3/5] 매팅 엔진 코드")
-    for name, url in REPOS.items():
-        if not fetch_repo(name, url, ROOT.parent):
-            problems.append(f"{name} 코드")
+    if pack is not None:
+        problems += install_repos_offline(pack, ROOT.parent)
+    else:
+        for name, url in REPOS.items():
+            if not fetch_repo(name, url, ROOT.parent):
+                problems.append(f"{name} 코드")
 
     say("\n[4/5] 가중치")
-    for name, url, size, core in WEIGHTS:
-        if core or not args.minimal:
-            if not download(url, models / name, size):
-                problems.append(name)
+    if pack is not None:
+        problems += copy_weights_offline(pack, models, args.minimal)
+    else:
+        for name, url, size, core in WEIGHTS:
+            if core or not args.minimal:
+                if not download(url, models / name, size):
+                    problems.append(name)
 
     say("\n[5/5] 마무리")
     write_python_path()
@@ -290,7 +388,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     say()
     if problems:
         say("일부 항목이 실패했습니다: " + ", ".join(problems))
-        say("인터넷 연결을 확인하고 install_windows.bat 을 다시 실행하면 이어서 받습니다.")
+        say("오프라인 팩 설치를 다시 실행해 주세요." if pack else "인터넷 연결을 확인하고 install_windows.bat 을 다시 실행하면 이어서 받습니다.")
         return 1
     missing = offline_missing()
     if missing and not args.minimal:

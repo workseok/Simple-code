@@ -106,6 +106,10 @@
 - 삭제: 프로젝트 폴더, `..\BackgroundMattingV2`, `..\RobustVideoMatting`, 바탕화면 바로가기,
   conda 환경(`conda env remove -n bgmatte`)을 지우면 됩니다.
 
+## 오프라인 설치
+
+인터넷이 안 되는 PC에는 **오프라인 팩**으로 설치할 수 있습니다. 만드는 법과 설치법은 [OFFLINE_PACK.md](OFFLINE_PACK.md) 를 보세요.
+
 ## 7. 구조 (개발자용)
 
 - `packaging/install_windows.bat`: conda 찾기/설치 → 환경 `bgmatte` 생성 → `packaging/setup_windows.py` 실행. 설치 로직은 대부분 파이썬이라 테스트할 수 있습니다 (`tests/test_setup_windows.py`).
