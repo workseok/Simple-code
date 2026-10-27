@@ -767,6 +767,35 @@ def test_bottom_chips_default_and_toggle_persist(harness):
     assert w.cfg.error_popup is False
 
 
+def test_composite_chip_is_next_to_fps_and_switches_to_raw_camera(harness):
+    h = harness()
+    w = h.window
+    assert w.btn_composite.isChecked() and w.btn_composite.text() == "합성 배경"
+    layout = w.controls.layout()
+    order = [layout.itemAt(i).widget() for i in range(layout.count()) if layout.itemAt(i).widget() is not None]
+    assert order.index(w.btn_composite) + 1 == order.index(w.btn_fps), "FPS 버튼 바로 왼쪽"
+    h.start_running()
+    w._on_fps(24.0)
+    assert "원본" not in w.preview._fps_text
+    w.btn_composite.click()
+    assert w._composite is False and "원본 영상" in w.preview._fps_text
+    assert h.until(lambda: w._worker._raw is True)
+    w.btn_fps.click()  # FPS 표시를 꺼도 '원본 영상' 표시는 남는다
+    assert w.preview._fps_text == "원본 영상"
+    w.btn_composite.click()
+    assert h.until(lambda: w._worker._raw is False) and w.preview._fps_text == ""
+
+
+def test_raw_choice_is_kept_when_pipeline_restarts_and_not_saved(harness):
+    h = harness()
+    w = h.window
+    w.btn_composite.click()
+    saved_before = len(h.saved)
+    h.start_running()
+    assert h.until(lambda: w._worker._raw is True)
+    assert len(h.saved) == saved_before or all("composite" not in str(s) for s in h.saved)
+
+
 def test_fps_badge_only_when_running_and_switch_on(harness):
     h = harness()
     w = h.window

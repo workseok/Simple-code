@@ -93,6 +93,7 @@ class PipelineWorker(QThread):
         self._state = "idle"
         self._active_step: Optional[int] = None
         self._show_alpha = False
+        self._raw = False  # True면 합성하지 않고 카메라 원본을 그대로 보냄 (카메라 확인용)
         self._bg_index = 0
         if self._backgrounds:
             self._bg_index = min(max(cfg.last_background, 1), len(self._backgrounds)) - 1
@@ -126,6 +127,10 @@ class PipelineWorker(QThread):
 
     def toggle_alpha(self) -> None:
         self._cmds.put(("alpha",))
+
+    def set_raw_view(self, raw: bool) -> None:
+        """True: 합성 없이 카메라 원본만 보여줍니다 (모델 추론도 건너뜀). False: 다시 합성."""
+        self._cmds.put(("raw", bool(raw)))
 
     def start_capture(self) -> None:
         self._cmds.put(("capture",))
@@ -273,7 +278,7 @@ class PipelineWorker(QThread):
                 self._emit_frame(frame)
                 continue
 
-            out = self._process(matter, frame)
+            out = frame if self._raw else self._process(matter, frame)
             if out is None:
                 continue
             self._emit_frame(out)
@@ -313,6 +318,8 @@ class PipelineWorker(QThread):
             if kind == "alpha":
                 self._show_alpha = not self._show_alpha
                 self.alpha_changed.emit(self._show_alpha)
+            elif kind == "raw":
+                self._raw = cmd[1]
             elif kind in ("bg", "bg_step"):
                 if matter is None:
                     continue  # 모델 준비 전에는 전환할 수 없음 (GUI가 먼저 안내)

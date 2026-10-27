@@ -198,6 +198,22 @@ def test_alpha_toggle_is_applied_to_processing(env):
     stop(worker)
 
 
+def test_raw_view_skips_compositing_and_can_resume(env):
+    _, cfg, folder, _ = env
+    worker, _, matter, rec = make_worker(cfg, folder)
+    worker.start()
+    assert wait_for(lambda: rec.has_state("running"))
+    worker.set_raw_view(True)
+    time.sleep(0.3)
+    n = matter.processed
+    time.sleep(0.4)
+    assert matter.processed == n, "원본 보기 중에는 합성(추론)을 하지 않습니다"
+    frames = len([e for e in rec.events if e[0] == "frame"]) if any(e[0] == "frame" for e in rec.events) else None
+    worker.set_raw_view(False)
+    assert wait_for(lambda: matter.processed > n)
+    stop(worker)
+
+
 # ---------------------------------------------------------------- 빈 배경(bgr) 촬영
 def test_missing_bgr_waits_then_captures_then_runs(env):
     _, cfg, folder, bgr = env

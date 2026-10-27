@@ -174,6 +174,7 @@ class MainWindow(QMainWindow):
         self._current_bg = 0
         self._fps = 0.0
         self._alpha = False
+        self._composite = True
         self._device = ""
         self._resolution = ""
 
@@ -317,6 +318,10 @@ class MainWindow(QMainWindow):
         self.footnote.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         bar.addWidget(self.footnote, 1)
 
+        self.btn_composite = self._make_chip("합성 배경", checkable=True)
+        self.btn_composite.setChecked(True)
+        self.btn_composite.setToolTip("끄면 합성 없이 카메라 원본 영상만 보여 줍니다 (카메라 확인용). 앱을 다시 켜면 켜진 상태로 시작합니다.")
+        self.btn_composite.toggled.connect(self.set_composite)
         self.btn_fps = self._make_chip("FPS", checkable=True)
         self.btn_fps.setChecked(self.cfg.show_fps)
         self.btn_fps.toggled.connect(self.set_show_fps)
@@ -329,7 +334,7 @@ class MainWindow(QMainWindow):
         self.btn_shortcuts = self._make_chip("단축키")
         self.btn_shortcuts.setToolTip("단축키 안내를 열고 닫습니다 (K)")
         self.btn_shortcuts.clicked.connect(self.toggle_shortcuts)
-        for chip in (self.btn_fps, self.btn_error_popup, self.btn_log, self.btn_shortcuts):
+        for chip in (self.btn_composite, self.btn_fps, self.btn_error_popup, self.btn_log, self.btn_shortcuts):
             bar.addWidget(chip)
         rows.addWidget(self.controls)
         root.addWidget(self.bottom)
@@ -346,6 +351,13 @@ class MainWindow(QMainWindow):
         chip.setCheckable(checkable)
         chip.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         return chip
+
+    def set_composite(self, on: bool) -> None:
+        """합성 배경 켜기/끄기. 끄면 카메라 원본만 보입니다 (저장하지 않는 임시 보기 설정)."""
+        self._composite = on
+        if self._worker is not None:
+            self._worker.set_raw_view(not on)
+        self._refresh_fps()
 
     def set_show_fps(self, on: bool) -> None:
         self.cfg.show_fps = on
@@ -492,6 +504,8 @@ class MainWindow(QMainWindow):
         self._scan_backgrounds()
         worker = self._worker_factory(self.cfg, self._backgrounds)
         self._worker = worker
+        if not self._composite:
+            worker.set_raw_view(True)
         _Bridge(self, worker)
         worker.start()
 
@@ -720,6 +734,8 @@ class MainWindow(QMainWindow):
             text = f"{self._fps:.1f} FPS" + (" · 알파" if self._alpha else "")
         else:
             text = ""
+        if not self._composite and self._state in ("running", "capturing"):
+            text = (text + " · " if text else "") + "원본 영상"
         self.preview.set_fps_badge(text)
 
     def _refresh_fps_tip(self) -> None:
