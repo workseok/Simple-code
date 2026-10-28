@@ -683,7 +683,7 @@ def test_same_camera_cannot_be_opened_in_two_windows(harness):
     assert h.until(lambda: mon._state == "running")
     mon.cam_row.button(0).click()  # 0번은 메인이 사용 중
     assert mon.cfg.camera_index == 1
-    assert "다른 창에서 쓰고 있습니다" in mon.note.text()
+    assert any("다른 창에서 쓰고 있습니다" in mon.history.item(i).text() for i in range(mon.history.count()))
     h.window.cam_row.button(1).click()  # 1번은 모니터가 사용 중
     pump(h.qapp, 30)
     assert h.window.cfg.camera_index == 0
@@ -718,6 +718,44 @@ def test_monitor_stopped_frees_its_camera_and_closing_main_closes_monitors(harne
     h.window.close()
     pump(h.qapp, 50)
     assert h.window._monitors == []
+
+
+def test_monitor_window_is_a_full_clone_with_the_same_controls(harness):
+    h = harness()
+    h.window.cfg.show_fps = False
+    h.window.btn_fps.setChecked(False)
+    h.start_running()
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    assert type(mon) is type(h.window)
+    assert h.until(lambda: mon._state == "running" and mon.preview.has_frame())
+    for name in ("btn_composite", "btn_fps", "btn_error_popup", "btn_log", "btn_shortcuts", "btn_capture",
+                 "btn_settings", "btn_monitor", "bus", "cam_row", "preview_frame"):
+        assert hasattr(mon, name), name
+    assert mon.btn_fps.isChecked() is False, "메인 창의 스위치 상태를 그대로 복사합니다"
+    assert "모니터 2" in mon.windowTitle()
+    # 복제 창에서도 합성 배경 끄기 / 알파 / 모니터 추가가 동작한다
+    mon.btn_composite.click()
+    assert h.until(lambda: mon._worker._raw is True)
+    assert h.window._worker._raw is False, "메인 창에는 영향 없음"
+    mon.open_monitor()
+    assert len(h.window._monitors) == 2 and mon._monitors == [], "복제 창에서 눌러도 한 묶음으로 관리"
+    assert h.window._monitors[1].cfg.camera_index == 2
+
+
+def test_monitor_clone_does_not_overwrite_saved_settings(harness):
+    h = harness()
+    h.start_running()
+    saved_before = len(h.saved)
+    h.window.open_monitor()
+    mon = h.window._monitors[0]
+    mon.btn_error_popup.click()
+    mon.select_background(2)
+    pump(h.qapp, 30)
+    assert len(h.saved) == saved_before, "복제 창의 변경은 저장하지 않습니다"
+    mon.close()
+    pump(h.qapp, 30)
+    assert h.window._monitors == [] and h.window._state == "running"
 
 
 def test_no_free_camera_number_explains(harness):

@@ -190,12 +190,8 @@ QLabel#bgName {{ font-size: 15px; font-weight: 600; }}
 QLabel#fpsValue {{ color: {p.CYAN}; font-weight: 700; }}
 QFrame#hairline {{ background: {p.HAIRLINE}; border: none; max-height: 1px; min-height: 1px; }}
 
-/* 제목 아래 세 가지 색 띠 */
-QFrame#accentLine {{
-    border: none; min-height: 3px; max-height: 3px; border-radius: 1px;
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {p.BRAND}, stop:0.5 {p.PINK}, stop:1 {p.WAIT});
-}}
+/* 제목 아래 구분선 (색 없이 얇은 선 하나) */
+QFrame#accentLine {{ border: none; min-height: 1px; max-height: 1px; background: {p.HAIRLINE}; }}
 
 /* 오른쪽 패널의 영역 상자와 색 막대 */
 QFrame#panel {{ background: {p.PANEL}; border: 1px solid {p.PANEL_BORDER}; border-radius: 10px; }}
@@ -220,28 +216,26 @@ QPushButton#primary[running="true"] {{ background: {p.STOP}; border-color: {p.ST
 QPushButton#primary:disabled {{ background: {p.PRIMARY_DISABLED_BG}; color: {p.PRIMARY_DISABLED_TEXT}; border-color: {p.PRIMARY_DISABLED_BG}; }}
 QPushButton#primary[demoted="true"] {{ background: {p.SURFACE}; color: {p.TEXT}; border-color: {p.HAIRLINE}; font-weight: 400; }}
 
-/* 배경 촬영: 분홍 테두리, 촬영이 필요할 때는 꽉 찬 분홍 */
-QPushButton#capture {{ color: {p.PINK}; border-color: {p.PINK}; font-weight: 600; }}
-QPushButton#capture:hover {{ background: {p.SURFACE_HOVER}; }}
-QPushButton#capture:disabled {{ color: {p.FAINT}; border-color: {p.BORDER_SOFT}; font-weight: 400; }}
-QPushButton#capture[emphasis="true"], QPushButton[emphasis="true"] {{ background: {p.PINK}; color: {p.ON_PRIMARY}; border-color: {p.PINK}; font-weight: 700; }}
-QPushButton#capture[emphasis="true"]:hover, QPushButton[emphasis="true"]:hover {{ background: {p.PINK}; }}
+/* 배경 촬영: 평소엔 다른 버튼과 같은 모양, 촬영이 필요할 때만 브랜드 색으로 강조 */
+QPushButton#capture:disabled {{ color: {p.FAINT}; border-color: {p.BORDER_SOFT}; }}
+QPushButton#capture[emphasis="true"], QPushButton[emphasis="true"] {{ background: {p.BRAND}; color: {p.ON_PRIMARY}; border-color: {p.BRAND}; font-weight: 700; }}
+QPushButton#capture[emphasis="true"]:hover, QPushButton[emphasis="true"]:hover {{ background: {p.BRAND_HOVER}; }}
 
 QPushButton#seg {{
     padding: 3px 10px; font-size: 12px; color: {p.MUTED};
     background: {p.SURFACE}; border: 1px solid {p.HAIRLINE};
 }}
-QPushButton#seg:checked {{ background: {p.BRAND}; color: {p.ON_PRIMARY}; border-color: {p.BRAND}; font-weight: 700; }}
+QPushButton#seg:checked {{ background: {p.SURFACE_PRESSED}; color: {p.TEXT}; border-color: {p.BORDER_STRONG}; font-weight: 700; }}
 QPushButton#seg[pos="left"] {{ border-top-right-radius: 0; border-bottom-right-radius: 0; }}
 QPushButton#seg[pos="right"] {{ border-top-left-radius: 0; border-bottom-left-radius: 0; }}
 
-/* 화면 아래의 작은 스위치/버튼 (FPS · 오류 팝업 · 단축키 · 알림 기록) */
+/* 화면 아래의 작은 스위치/버튼. 켜짐은 색 대신 눌린 모양 + 진한 글씨로 표시 */
 QPushButton#chip {{
     padding: 4px 11px; font-size: 12px; color: {p.MUTED};
     background: {p.SURFACE}; border: 1px solid {p.HAIRLINE}; border-radius: 12px;
 }}
 QPushButton#chip:hover {{ background: {p.SURFACE_HOVER}; color: {p.TEXT}; }}
-QPushButton#chip:checked {{ background: {p.BRAND}; color: {p.ON_PRIMARY}; border-color: {p.BRAND}; font-weight: 700; }}
+QPushButton#chip:checked {{ background: {p.SURFACE_PRESSED}; color: {p.TEXT}; border-color: {p.BORDER_STRONG}; font-weight: 700; }}
 
 /* 배경 번호 버튼: 스위처처럼 번호마다 아래쪽에 색이 칠해져 있고, 사용 중인 번호만 초록으로 켜집니다 */
 QPushButton#bus {{
@@ -261,10 +255,6 @@ QLabel#keycap {{
     background: {p.SURFACE}; border: 1px solid {p.BORDER_STRONG}; border-bottom: 2px solid {p.BORDER_STRONG};
     border-radius: 4px; padding: 0 6px; font-weight: 700; min-width: 14px;
 }}
-QLabel#keycap[tone="brand"] {{ color: {p.BRAND}; border-color: {p.BRAND}; }}
-QLabel#keycap[tone="pink"] {{ color: {p.PINK}; border-color: {p.PINK}; }}
-QLabel#keycap[tone="cyan"] {{ color: {p.CYAN}; border-color: {p.CYAN}; }}
-QLabel#keycap[tone="amber"] {{ color: {p.WAIT}; border-color: {p.WAIT}; }}
 
 /* 상태 · 단축키 · 알림 기록은 보조 정보라서 한 단계 작게 표시 */
 QWidget#compact QLabel {{ font-size: 11px; }}

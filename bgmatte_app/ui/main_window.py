@@ -153,8 +153,12 @@ class MainWindow(QMainWindow):
         save: Callable[[Config], None] = save_config,
         open_url: Callable[[QUrl], object] = QDesktopServices.openUrl,
         auto_start: bool = True,
+        owner: Optional["MainWindow"] = None,
+        title_no: int = 1,
     ):
         super().__init__()
+        self._owner = owner  # None이면 메인 창, 아니면 메인 창을 복제해 띄운 모니터 창
+        self._title_no = title_no
         self.cfg = cfg
         self._startup_warning = startup_warning
         self._worker_factory = worker_factory
@@ -166,7 +170,7 @@ class MainWindow(QMainWindow):
 
         self._worker: Optional[PipelineWorker] = None
         self._retiring: List[PipelineWorker] = []
-        self._monitors: list = []  # 열려 있는 모니터 창 (MonitorWindow)
+        self._monitors: list = []  # 메인 창이 띄운 모니터 창들 (MainWindow 복제본). 모니터 창에서는 비어 있음
         self._awaiting_permission = False
         self._state = "idle"
         self._step_text = ""
@@ -178,7 +182,9 @@ class MainWindow(QMainWindow):
         self._device = ""
         self._resolution = ""
 
-        self.setWindowTitle(f"{APP_NAME} {__version__}")
+        self._refresh_title()
+        if owner is not None:
+            self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.resize(1180, 860)
         self.setMinimumSize(900, 640)
         theme.set_theme(self.cfg.theme)
@@ -468,7 +474,7 @@ class MainWindow(QMainWindow):
             return
         self.banner.clear()
         self.steps.reset()
-        if any(m.uses_camera(self.cfg.camera_index) for m in self._monitors):
+        if self.camera_in_use(self.cfg.camera_index, self):
             self._fail_with(replace(messages.camera_in_use(self.cfg.camera_index), banner=True))
             return
         self._set_state("starting")
@@ -567,13 +573,28 @@ class MainWindow(QMainWindow):
             return
         self._worker.select_background(number)
 
+    # ---- 메인 창 + 모니터 창 전체를 한 묶음(family)으로 보고 카메라 중복을 막습니다
+    @property
+    def _root(self) -> "MainWindow":
+        return self._owner or self
+
+    def _family(self) -> list:
+        root = self._root
+        return [root, *root._monitors]
+
+    def uses_camera(self, index: int) -> bool:
+        """이 창이 지금 그 번호의 카메라를 열고 있는(또는 권한을 기다리는) 중인지. 정지해 있으면 카메라를 놓은 상태입니다."""
+        return self.cfg.camera_index == index and (self._worker is not None or self._awaiting_permission)
+
     def camera_in_use(self, index: int, exclude: object = None) -> bool:
         """그 번호의 카메라를 (exclude 창을 뺀) 다른 창이 열고 있는지."""
-        if exclude is not self and self.cfg.camera_index == index and (
-            self._worker is not None or self._awaiting_permission
-        ):
-            return True
-        return any(m is not exclude and m.uses_camera(index) for m in self._monitors)
+        return any(w is not exclude and w.uses_camera(index) for w in self._family())
+
+    def _refresh_title(self) -> None:
+        title = f"{APP_NAME} {__version__}"
+        if self._owner is not None:
+            title += f" — 모니터 {self._title_no} (카메라 {self.cfg.camera_index}번)"
+        self.setWindowTitle(title)
 
     def select_camera(self, index: int) -> None:
         """미리보기 아래 번호 버튼: 이 창이 쓰는 카메라를 바꿉니다 (실행 중이면 새 카메라로 다시 시작)."""
@@ -584,28 +605,35 @@ class MainWindow(QMainWindow):
             return
         self.cfg.camera_index = index
         self.cam_row.set_current(index)
+        self._refresh_title()
         self._persist()
         if self._worker is not None or self._awaiting_permission:
             self.restart_pipeline()
 
     def open_monitor(self) -> None:
-        """메인 창과 별개로, 다른 카메라의 실시간 합성 영상을 보는 창을 하나 더 엽니다."""
-        from .monitor_window import MonitorWindow
-
-        free = [
-            i for i in range(CamRow.SLOTS) if i != self.cfg.camera_index and not self.camera_in_use(i, None)
-        ]
+        """지금 창을 그대로 복제한 새 창을 띄웁니다 (같은 화면, 같은 기능). 쓰지 않는 가장 낮은 번호의 카메라로 시작합니다."""
+        root = self._root
+        free = [i for i in range(CamRow.SLOTS) if i != self.cfg.camera_index and not self.camera_in_use(i, None)]
         if not free:
             self._add_notice(messages.no_free_camera(CamRow.SLOTS))
             return
-        cfg = replace(self.cfg, camera_index=free[0])
-        taken = {m._title_no for m in self._monitors}
+        # 이 창의 현재 설정을 복사 (카메라 번호만 바뀜). 복제본의 변경은 저장하지 않습니다.
+        cfg = replace(self.cfg, camera_index=free[0], last_background=self._current_bg or self.cfg.last_background)
+        taken = {m._title_no for m in root._monitors}
         number = next(n for n in range(2, 99) if n not in taken)
-        window = MonitorWindow(
-            cfg, self._worker_factory, self.camera_in_use, self._on_monitor_closed,
-            title_no=number, auto_start=False,
+        window = MainWindow(
+            cfg,
+            worker_factory=self._worker_factory,
+            auth_status=self._auth_status,
+            auth_request=self._auth_request,
+            camera_probe=self._camera_probe,
+            save=lambda _cfg: None,
+            open_url=self._open_url,
+            auto_start=False,
+            owner=root,
+            title_no=number,
         )
-        self._monitors.append(window)
+        root._monitors.append(window)
         window.show()
         window.start_pipeline()  # 바로 시작해야 곧이어 여는 창이 같은 카메라 번호를 고르지 않습니다
 
@@ -858,6 +886,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         for monitor in list(self._monitors):
             monitor.close()
+        if self._owner is not None:
+            self._owner._on_monitor_closed(self)
         self._log_dialog.close()
         self._shortcuts_dialog.close()
         self._persist()
