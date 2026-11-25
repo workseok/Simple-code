@@ -21,7 +21,7 @@
 3. 검은 창에서 글자가 올라가는 동안 기다립니다 (10~30분). 자동으로 하는 일:
    - 전용 파이썬 환경 `bgmatte` 만들기, PyTorch 설치 (NVIDIA GPU가 있으면 GPU용을 먼저 시도)
    - 앱 라이브러리 설치
-   - 엔진 코드 2종을 프로젝트 폴더 **옆**에 받기 (`..\BackgroundMattingV2`, `..\RobustVideoMatting`)
+   - 엔진 코드 2종을 프로젝트 폴더 안의 `models` 폴더에 받기 (`models\BackgroundMattingV2`, `models\RobustVideoMatting`)
    - 가중치 5종 전부를 `models` 폴더에 받기 (약 540MB, 파일 크기까지 검사)
    - 바탕화면에 **GW_CCT_AI Matte Live** 바로가기 만들기, 셀프체크 실행
 4. 마지막에 "설치가 끝났습니다"와 "이제 인터넷 연결 없이 사용할 수 있습니다"가 나오면 완료입니다. 가중치 5종과 엔진 코드가 모두 이 PC에 있다는 뜻입니다.
@@ -82,7 +82,7 @@
 | 설정 파일 | `%APPDATA%\BGMatte\config.json` |
 | 로그 | `%LOCALAPPDATA%\BGMatte\app.log` |
 | 가중치 | `<프로젝트>\models\` |
-| 엔진 코드 | `<프로젝트>\..\BackgroundMattingV2`, `..\RobustVideoMatting` |
+| 엔진 코드 | `<프로젝트>\models\BackgroundMattingV2`, `models\RobustVideoMatting` |
 | 합성 배경 / 빈 배경 | `<프로젝트>\backgrounds\`, `<프로젝트>\bgr.png` |
 
 맥에서 쓰던 설정은 이어지지 않습니다. 경로 형식이 다르기 때문에 윈도우에서 새로 정하세요.
@@ -103,7 +103,7 @@
 ## 6. 업데이트·삭제
 
 - 업데이트: 새 zip의 파일을 같은 폴더에 덮어쓴 뒤, 필요하면 `install_windows.bat`을 다시 실행합니다 (이미 받은 것은 건너뜁니다).
-- 삭제: 프로젝트 폴더, `..\BackgroundMattingV2`, `..\RobustVideoMatting`, 바탕화면 바로가기,
+- 삭제: 프로젝트 폴더(모델 파일과 엔진 코드가 모두 안에 있습니다), 바탕화면 바로가기,
   conda 환경(`conda env remove -n bgmatte`)을 지우면 됩니다.
 
 ## 오프라인 설치

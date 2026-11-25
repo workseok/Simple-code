@@ -95,14 +95,14 @@ def test_repos_and_weights_are_installed_from_pack_without_network(tmp_path, mon
 
     monkeypatch.setattr(sw.urllib.request, "urlopen", boom)
     pack = make_pack(tmp_path / "offline")
-    parent = tmp_path / "BGMatte"
-    assert sw.install_repos_offline(pack, parent) == []
-    assert (parent / "BackgroundMattingV2" / "model" / "__init__.py").is_file()
-    models = parent / "app" / "models"
+    app = tmp_path / "BGMatte" / "app"
+    models = app / "models"
+    assert sw.install_repos_offline(pack, models) == []
+    assert (models / "BackgroundMattingV2" / "model" / "__init__.py").is_file()
     assert sw.copy_weights_offline(pack, models) == []
-    assert sw.offline_missing(parent / "app") == []
+    assert sw.offline_missing(app) == []
     # 다시 실행해도 안전 (이미 있음)
-    assert sw.install_repos_offline(pack, parent) == [] and sw.copy_weights_offline(pack, models) == []
+    assert sw.install_repos_offline(pack, models) == [] and sw.copy_weights_offline(pack, models) == []
 
 
 def test_minimal_copies_only_core_weights(tmp_path):

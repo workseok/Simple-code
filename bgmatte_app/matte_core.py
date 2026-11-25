@@ -121,7 +121,7 @@ def _check_files(cfg: Config, engine: str, repo: Path, ckpt: Path) -> None:
 
 
 def _load_bmv2(cfg: Config, device: torch.device):
-    repo = cfg.resolve(cfg.repo_path)
+    repo = cfg.resolve_repo(cfg.repo_path)
     ckpt = cfg.resolve(cfg.checkpoint_for(cfg.backbone))
     _check_files(cfg, "bmv2", repo, ckpt)
 
@@ -159,7 +159,7 @@ def _load_bmv2(cfg: Config, device: torch.device):
 
 
 def _load_rvm(cfg: Config, device: torch.device):
-    repo = cfg.resolve(cfg.rvm_repo)
+    repo = cfg.resolve_repo(cfg.rvm_repo)
     ckpt = cfg.resolve(cfg.rvm_checkpoint_for())
     _check_files(cfg, "rvm", repo, ckpt)
     key = ("rvm", str(repo), str(ckpt), cfg.rvm_variant, device.type)

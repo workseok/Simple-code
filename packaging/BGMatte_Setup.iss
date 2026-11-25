@@ -3,7 +3,7 @@
 ;
 ; 이 설치 프로그램은 앱 파일을 C:\BGMatte\app 에 복사한 뒤 packaging\install_windows.bat 을 실행합니다.
 ; (파이썬 환경, PyTorch, 엔진 코드, 가중치는 설치 중에 인터넷에서 받습니다.)
-; 엔진 코드 폴더(..\BackgroundMattingV2, ..\RobustVideoMatting)가 앱 폴더 '옆'에 만들어져야 하므로
+; 엔진 코드와 가중치는 모두 앱 폴더 안의 models 폴더에 받습니다.
 ; 설치 위치는 C:\BGMatte\app 으로 고정합니다 (한글·공백이 없는 경로).
 
 #define AppName "GW_CCT_AI Matte Live"

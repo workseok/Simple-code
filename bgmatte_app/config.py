@@ -57,7 +57,7 @@ class Config:
     # 엔진 선택 (아래 '모델' 설정은 bmv2, 그 아래 rvm 설정은 각 엔진용)
     engine: str = "bmv2"
     # 모델
-    repo_path: str = "../BackgroundMattingV2"
+    repo_path: str = "models/BackgroundMattingV2"
     # 백본마다 가중치 파일이 따로 필요합니다 (층 구조가 달라 서로 바꿔 쓸 수 없습니다).
     # checkpoint는 예전 설정 파일과의 호환을 위해 이름을 유지한 resnet50용 경로입니다.
     checkpoint: str = "models/pytorch_resnet50.pth"
@@ -70,7 +70,7 @@ class Config:
     refine_sample_pixels: int = 80_000
     device: str = "auto"
     # RobustVideoMatting: 이전 프레임 상태를 이어받는 영상 매팅. downsample이 작을수록 빠름
-    rvm_repo: str = "../RobustVideoMatting"
+    rvm_repo: str = "models/RobustVideoMatting"
     rvm_variant: str = "mobilenetv3"
     rvm_checkpoint: str = "models/rvm_mobilenetv3.pth"
     rvm_checkpoint_resnet50: str = "models/rvm_resnet50.pth"
@@ -97,6 +97,17 @@ class Config:
 
     def resolve(self, value: str) -> Path:
         return resolve_path(value)
+
+    def resolve_repo(self, value: str) -> Path:
+        """엔진 코드 폴더. 설정한 곳에 없으면 예전 위치(프로젝트 폴더 옆, ../이름)와 models/이름을 차례로 찾습니다."""
+        path = resolve_path(value)
+        if path.is_dir():
+            return path
+        name = Path(value.replace("\\", "/")).name
+        for candidate in (resolve_path("models/" + name), resolve_path("../" + name)):
+            if candidate.is_dir():
+                return candidate
+        return path
 
     def checkpoint_for(self, backbone: Optional[str] = None) -> str:
         """백본에 맞는 가중치 경로(설정 문자열)를 반환합니다. 기본은 현재 선택된 백본."""

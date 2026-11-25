@@ -21,7 +21,7 @@
 1. `BGMatte_Setup.exe` 더블클릭 → 설치 → 검은 창에서 10~30분 대기 (인터넷 필요)
 2. 완료되면 바탕화면 **GW_CCT_AI Matte Live** 실행
 
-앱은 `C:\BGMatte\app` 에, 엔진 코드는 `C:\BGMatte\` 옆 폴더에 설치됩니다.
+앱은 `C:\BGMatte\app` 에 설치되며, 엔진 코드와 가중치는 그 안의 `models` 폴더에 들어갑니다.
 `models`, `backgrounds`, `bgr.png` 는 설치 중에 만들어지거나 팀원이 각자 설정합니다.
 
 ## 알아둘 점

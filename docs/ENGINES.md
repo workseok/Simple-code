@@ -29,7 +29,7 @@ bash packaging/install_engines.sh          # RVM(mobilenetv3) 설치
 ```
 
 - resnet50 가중치(108MB)까지 받으려면: `bash packaging/install_engines.sh rvm50`
-- 코드는 프로젝트 폴더 **옆**(`../RobustVideoMatting`)에, 가중치는 `models/`에 저장됩니다.
+- 코드와 가중치는 모두 프로젝트 폴더 안의 `models/`에 저장됩니다. (맥 `install_engines.sh`는 예전처럼 `../RobustVideoMatting`에 받으며, 앱이 그 위치도 찾아 줍니다.)
   설정 화면의 기본값이 이 위치와 같아서 따로 지정할 필요가 없습니다.
 - 여러 번 실행해도 안전합니다. 이미 받은 파일은 건너뜁니다.
 

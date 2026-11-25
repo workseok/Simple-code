@@ -90,8 +90,7 @@ def test_offline_report_lists_everything_missing_then_nothing(tmp_path, monkeypa
     small = tuple((n, u, 10, c) for n, u, _s, c in sw.WEIGHTS)
     monkeypatch.setattr(sw, "WEIGHTS", small)
     for name in sw.REPOS:
-        (tmp_path / name / "model").mkdir(parents=True)
-    (root / "models").mkdir()
+        (root / "models" / name / "model").mkdir(parents=True)
     for n, *_ in small:
         (root / "models" / n).write_bytes(b"x" * 10)
     assert sw.offline_missing(root) == []
@@ -148,3 +147,18 @@ def test_shortcut_falls_back_to_bat_without_pythonw(tmp_path):
     (tmp_path / "python.exe").write_bytes(b"")
     target, args = sw.shortcut_command(str(tmp_path / "python.exe"), root=tmp_path / "app")
     assert Path(target).name == "BGMatte.bat" and args == ""
+
+
+def test_repo_default_is_inside_models_and_old_location_still_found(tmp_path, monkeypatch):
+    from bgmatte_app import config as cfgmod
+    from bgmatte_app.config import Config
+
+    cfg = Config()
+    assert cfg.repo_path.startswith("models/") and cfg.rvm_repo.startswith("models/")
+    monkeypatch.setattr(cfgmod, "PROJECT_ROOT", tmp_path / "app")
+    (tmp_path / "RobustVideoMatting").mkdir()
+    (tmp_path / "app").mkdir()
+    assert cfg.resolve_repo("../RobustVideoMatting") == (tmp_path / "RobustVideoMatting").resolve()
+    assert cfg.resolve_repo(cfg.rvm_repo) == (tmp_path / "RobustVideoMatting").resolve()
+    (tmp_path / "app" / "models" / "RobustVideoMatting").mkdir(parents=True)
+    assert cfg.resolve_repo(cfg.rvm_repo) == (tmp_path / "app" / "models" / "RobustVideoMatting").resolve()

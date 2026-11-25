@@ -3,8 +3,8 @@
 하는 일 (여러 번 실행해도 안전합니다 — 이미 있는 것은 건너뜁니다):
   1. PyTorch 설치: NVIDIA GPU가 있으면 CUDA 빌드를 시도하고, 안 되면 CPU 빌드로 내려갑니다.
   2. 앱 라이브러리 설치 (requirements.txt, requirements-app.txt)
-  3. 매팅 엔진 코드 3종을 프로젝트 폴더 '옆'에 내려받기 (git 불필요, zip으로 받음)
-       ../BackgroundMattingV2  ../RobustVideoMatting
+  3. 매팅 엔진 코드 2종을 프로젝트 폴더 안의 models 폴더에 내려받기 (git 불필요, zip으로 받음)
+       models/BackgroundMattingV2  models/RobustVideoMatting
   4. 가중치 5종을 모두 내려받기 (파일 크기로 검증, 약 540MB): models/ 아래
   5. 바탕화면 바로가기 만들기, 셀프체크, '인터넷 없이 쓸 준비가 됐는지' 확인
 
@@ -62,7 +62,7 @@ def offline_missing(root: Path = ROOT) -> List[str]:
     """인터넷 없이 모든 엔진·백본을 쓰기 위해 이 PC에 있어야 하는데 빠진 항목 이름 목록(비어 있으면 준비 완료)."""
     missing: List[str] = []
     for name in REPOS:
-        folder = root.parent / name
+        folder = root / "models" / name
         if not (folder / "model").is_dir():
             missing.append(f"{name} 코드")
     for name, _url, size, _core in WEIGHTS:
@@ -365,10 +365,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     say("\n[3/5] 매팅 엔진 코드")
     if pack is not None:
-        problems += install_repos_offline(pack, ROOT.parent)
+        problems += install_repos_offline(pack, models)
     else:
         for name, url in REPOS.items():
-            if not fetch_repo(name, url, ROOT.parent):
+            if not fetch_repo(name, url, models):
                 problems.append(f"{name} 코드")
 
     say("\n[4/5] 가중치")
