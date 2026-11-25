@@ -1,4 +1,29 @@
-# Simple-code — 오프라인 실시간 배경 매팅 파이프라인
+# GW_CCT_AI Matte Live
+
+카메라 영상의 배경을 AI로 실시간 분리·합성하는 모니터링 앱입니다. (오프라인 동작)
+
+## 🚀 설치 방법 (Windows)
+
+1. 압축을 푼 폴더에서 **`Install_Windows.bat`** 을 더블클릭합니다.
+2. 안내에 따라 설치가 끝나면 바탕화면의 **GW_CCT_AI Matte Live** 바로가기로 실행합니다.
+
+인터넷이 없는 PC는 [docs/OFFLINE_PACK.md](docs/OFFLINE_PACK.md)(오프라인 설치 팩)를 참고하세요.
+Mac은 [docs/APP_MAC.md](docs/APP_MAC.md)를 따릅니다.
+
+## 폴더 구성
+
+| 이름 | 설명 |
+|---|---|
+| `Install_Windows.bat` | **윈도우 설치 파일 (이것만 실행하면 됩니다)** |
+| `README.md` | 이 안내 문서 |
+| `bgmatte_app/` | 앱 본체 소스 |
+| `packaging/` | 설치·배포용 스크립트 |
+| `docs/` | 상세 문서 |
+| `etc/` | 기타 파일(requirements, 명령줄 도구 `.py`, 오프라인 팩 생성 `.bat` 등) |
+
+---
+
+## 참고: 명령줄 파이프라인 (개발자용)
 
 그린스크린 없이, **완전 고정 카메라** 기준으로 실시간 배경 매팅을 수행하는
 로컬 파이프라인입니다. [BackgroundMattingV2](https://github.com/PeterL1n/BackgroundMattingV2)
@@ -32,7 +57,7 @@ Mac은 [docs/APP_MAC.md](docs/APP_MAC.md)를 따릅니다.
 쓸 수 있습니다 (PySide6). 설치와 사용법은 [docs/APP_MAC.md](docs/APP_MAC.md)를 참고하세요.
 
 ```bash
-pip install -r requirements-app.txt
+pip install -r etc/requirements-app.txt
 bash packaging/build_app.sh          # → dist/GW_CCT_AI Matte Live.app
 ```
 
@@ -48,9 +73,9 @@ bash packaging/build_app.sh          # → dist/GW_CCT_AI Matte Live.app
 
 | 파일 | 역할 |
 | --- | --- |
-| `capture_background.py` | 리허설 단계에서 1회 실행. 피사체 없는 클린 배경 프레임을 캡처해 `bgr.png`로 저장 |
-| `realtime_matte.py` | `bgr.png` 기준으로 실시간 입력과 비교해 알파 매트 추출 후 AI 배경(`ai_background.png`)과 합성 |
-| `utils.py` | 두 스크립트가 공유하는 텐서 변환/합성 헬퍼 |
+| `etc/capture_background.py` | 리허설 단계에서 1회 실행. 피사체 없는 클린 배경 프레임을 캡처해 `bgr.png`로 저장 |
+| `etc/realtime_matte.py` | `bgr.png` 기준으로 실시간 입력과 비교해 알파 매트 추출 후 AI 배경(`ai_background.png`)과 합성 |
+| `etc/utils.py` | 두 스크립트가 공유하는 텐서 변환/합성 헬퍼 |
 
 ## 검증 순서
 

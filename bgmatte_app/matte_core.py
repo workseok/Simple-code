@@ -23,10 +23,12 @@ from . import messages
 from .config import PROJECT_ROOT, Config
 from .messages import NoticeError
 
-# 저장소 루트의 utils.py를 쓰기 위해 경로를 보장합니다 (BackgroundMattingV2 경로를
+# etc 폴더의 utils.py를 쓰기 위해 경로를 보장합니다 (BackgroundMattingV2 경로를
 # sys.path 앞에 넣기 전에 먼저 import해 두어야 이름이 겹쳐도 우리 utils가 우선합니다).
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+_ETC_DIR = PROJECT_ROOT / "etc"
+for _p in (_ETC_DIR, PROJECT_ROOT):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 from utils import (  # noqa: E402
     composite,
     load_image_as_tensor,

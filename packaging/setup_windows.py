@@ -356,7 +356,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         install_torch(args.cpu)
 
     say("\n[2/5] 앱 라이브러리")
-    requirements = ("-r", str(ROOT / "requirements.txt"), "-r", str(ROOT / "requirements-app.txt"))
+    requirements = ("-r", str(ROOT / "etc" / "requirements.txt"), "-r", str(ROOT / "etc" / "requirements-app.txt"))
     if pack is not None:
         if pip_offline(pack, *requirements, check=False) != 0:
             problems.append("앱 라이브러리")

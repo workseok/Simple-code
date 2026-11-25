@@ -3,7 +3,7 @@
 #
 # 사용법 (bgmatte 환경을 켠 상태에서):
 #   conda activate bgmatte
-#   pip install -r requirements-app.txt      # 최초 1회
+#   pip install -r etc/requirements-app.txt  # 최초 1회
 #   bash packaging/build_app.sh              # → dist/GW_CCT_AI Matte Live.app
 #   bash packaging/build_app.sh --install    # → 위 + ~/Applications 에 복사
 #
@@ -50,9 +50,9 @@ PY
 if [[ -n "$missing" ]]; then
     echo "    없는 패키지: $missing" >&2
     if [[ "$missing" == *PySide6* ]]; then
-        fail "'pip install -r requirements-app.txt' 로 설치한 뒤 다시 실행해 주세요."
+        fail "'pip install -r etc/requirements-app.txt' 로 설치한 뒤 다시 실행해 주세요."
     fi
-    fail "'conda activate bgmatte' 상태에서 실행했는지 확인해 주세요. (필요: pip install -r requirements.txt)"
+    fail "'conda activate bgmatte' 상태에서 실행했는지 확인해 주세요. (필요: pip install -r etc/requirements.txt)"
 fi
 echo "    PySide6, OpenCV, torch 확인됨"
 

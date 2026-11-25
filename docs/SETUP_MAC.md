@@ -90,13 +90,13 @@ conda activate bgmatte
 ## 5. 의존성 설치
 
 ```bash
-pip install -r requirements.txt
+pip install -r etc/requirements.txt
 ```
 
 ### GPU(MPS) 가속에 대해
 
 Apple Silicon Mac에서는 PyTorch가 Apple의 **MPS**(Metal Performance
-Shaders) 백엔드를 통해 GPU 가속을 지원합니다. `requirements.txt`로 설치되는
+Shaders) 백엔드를 통해 GPU 가속을 지원합니다. `etc/requirements.txt`로 설치되는
 표준 PyTorch 패키지에 이미 MPS 지원이 포함되어 있으므로 별도 설치 단계는
 필요 없습니다.
 
@@ -167,7 +167,7 @@ cd Simple-code
 피사체(사람/물체)가 화면에 전혀 없는 상태에서 실행합니다.
 
 ```bash
-python capture_background.py --camera-index 0 --output bgr.png
+python etc/capture_background.py --camera-index 0 --output bgr.png
 ```
 
 - 미리보기 창에서 `SPACE`를 누르면 캡처, `ESC`를 누르면 취소됩니다.
@@ -181,7 +181,7 @@ python capture_background.py --camera-index 0 --output bgr.png
 ### 9-3. 실시간 매팅 실행
 
 ```bash
-python realtime_matte.py \
+python etc/realtime_matte.py \
     --repo-path ../BackgroundMattingV2 \
     --model-checkpoint models/pytorch_resnet50.pth \
     --model-backbone resnet50 \

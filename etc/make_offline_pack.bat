@@ -3,13 +3,13 @@ chcp 65001 >nul
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 title GW_CCT_AI Matte Live 오프라인 팩 만들기
-rem 이 파일이 있는 폴더(packaging 폴더가 보이는 곳)에서 실행됩니다. 경로를 입력할 필요가 없습니다.
-cd /d "%~dp0"
+rem 이 파일은 etc 폴더에 있고, 프로젝트 폴더(packaging 폴더가 보이는 곳)로 이동해서 실행합니다. 경로를 입력할 필요가 없습니다.
+cd /d "%~dp0.."
 
 if not exist "packaging\build_offline_pack.py" (
     echo.
     echo  packaging\build_offline_pack.py 를 찾지 못했습니다.
-    echo  이 파일을 'packaging' 폴더와 'requirements.txt' 가 함께 보이는 폴더 안으로 옮겨서 다시 실행해 주세요.
+    echo  이 파일을 프로젝트의 'etc' 폴더 안에 둔 채로 실행해 주세요. (프로젝트 폴더 전체를 압축 푼 상태여야 합니다)
     echo  현재 위치: %CD%
     goto :end
 )

@@ -172,11 +172,11 @@ def test_pack_excludes_user_data_when_copying_app(tmp_path):
 
 def test_requirements_files_are_ascii_so_pip_works_on_korean_windows():
     # 한국어 윈도우의 pip는 기본으로 cp949로 읽으므로 한글(UTF-8) 주석이 있으면 설치가 멈춥니다.
-    root = PKG.parent
+    root = PKG.parent / "etc"
     for name in ("requirements.txt", "requirements-app.txt"):
         (root / name).read_bytes().decode("ascii")
 
 
 def test_batch_files_force_utf8_mode():
-    for rel in ("make_offline_pack.bat", "packaging/install_offline.bat"):
+    for rel in ("etc/make_offline_pack.bat", "packaging/install_offline.bat", "Install_Windows.bat"):
         assert "PYTHONUTF8=1" in (PKG.parent / rel).read_text(encoding="utf-8"), rel

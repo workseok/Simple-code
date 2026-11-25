@@ -69,7 +69,7 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
    ```bash
    conda create -n bgmatte python=3.11 -y
    conda activate bgmatte
-   pip install -r requirements.txt -r requirements-app.txt
+   pip install -r etc/requirements.txt -r etc/requirements-app.txt
    ```
 3. 엔진 코드·가중치: `bash packaging/install_engines.sh`
 4. 사전 점검: `python -m bgmatte_app.selfcheck`
@@ -109,4 +109,4 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
 | `packaging/build_release.bat`, `bump_version.py` | 설치 파일 빌드 / 버전 올리기 |
 | `packaging/AppIcon.ico` / `.icns` | 아이콘 |
 | `packaging/build_app.sh`, `install_engines.sh` | Mac 앱 빌드·엔진 설치 |
-| `requirements.txt`, `requirements-app.txt` | 파이썬 라이브러리 목록 |
+| `etc/requirements.txt`, `etc/requirements-app.txt` | 파이썬 라이브러리 목록 |

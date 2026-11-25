@@ -82,14 +82,14 @@ def download_wheels(wheels: Path, cuda_tags: Sequence[str]) -> List[str]:
                             "--extra-index-url", PYPI):
             problems.append(f"PyTorch {tag}")
     sw.say("  앱 라이브러리 wheel 받는 중...")
-    if not pip_download(wheels, "-r", str(ROOT / "requirements.txt"), "-r", str(ROOT / "requirements-app.txt"),
+    if not pip_download(wheels, "-r", str(ROOT / "etc" / "requirements.txt"), "-r", str(ROOT / "etc" / "requirements-app.txt"),
                         "--find-links", str(wheels), "--index-url", PYPI):
         problems.append("앱 라이브러리")
     if not problems:
         sw.say("  검증: 받은 파일만으로 모두 설치 가능한지 확인...")
         scratch = wheels.parent / "_verify"
-        ok = pip_download(scratch, "torch", "torchvision", "-r", str(ROOT / "requirements.txt"),
-                          "-r", str(ROOT / "requirements-app.txt"), "--no-index", "--find-links", str(wheels))
+        ok = pip_download(scratch, "torch", "torchvision", "-r", str(ROOT / "etc" / "requirements.txt"),
+                          "-r", str(ROOT / "etc" / "requirements-app.txt"), "--no-index", "--find-links", str(wheels))
         shutil.rmtree(scratch, ignore_errors=True)
         if not ok:
             problems.append("wheel 검증(빠진 의존 패키지가 있음)")

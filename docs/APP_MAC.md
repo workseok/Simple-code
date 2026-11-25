@@ -7,7 +7,7 @@
 
 ```bash
 conda activate bgmatte                   # 기존 환경 (torch, opencv 설치된 환경)
-pip install -r requirements-app.txt      # PySide6, pyobjc(카메라 권한 확인용) — 최초 1회
+pip install -r etc/requirements-app.txt      # PySide6, pyobjc(카메라 권한 확인용) — 최초 1회
 bash packaging/build_app.sh              # → dist/GW_CCT_AI Matte Live.app
 bash packaging/build_app.sh --install    # 위 + ~/Applications 에 복사
 ```

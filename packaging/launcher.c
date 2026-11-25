@@ -154,7 +154,7 @@ int main(void) {
     mkdir_p(logdir);
     snprintf(logfile, sizeof logfile, "%s/app.log", logdir);
 
-    /* PYTHONPATH 앞에 프로젝트 폴더를 붙여 `-m bgmatte_app` 과 utils.py 를 찾게 한다. */
+    /* PYTHONPATH 앞에 프로젝트 폴더를 붙여 `-m bgmatte_app` 과 etc 폴더의 utils.py 를 찾게 한다. */
     const char *old_path = getenv("PYTHONPATH");
     char new_path[PATH_MAX * 2 + 2];
     if (old_path && *old_path)

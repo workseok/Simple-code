@@ -75,7 +75,7 @@ conda activate bgmatte
 ## 5. 의존성 설치
 
 ```bash
-pip install -r requirements.txt
+pip install -r etc/requirements.txt
 ```
 
 ### GPU(CUDA) 가속을 사용하려면 (선택)
@@ -157,7 +157,7 @@ cd Simple-code
 피사체(사람/물체)가 화면에 전혀 없는 상태에서 실행합니다.
 
 ```bash
-python capture_background.py --camera-index 0 --output bgr.png
+python etc/capture_background.py --camera-index 0 --output bgr.png
 ```
 
 - 미리보기 창에서 `SPACE`를 누르면 캡처, `ESC`를 누르면 취소됩니다.
@@ -171,7 +171,7 @@ python capture_background.py --camera-index 0 --output bgr.png
 ### 9-3. 실시간 매팅 실행
 
 ```bash
-python realtime_matte.py \
+python etc/realtime_matte.py \
     --repo-path ../BackgroundMattingV2 \
     --model-checkpoint models/pytorch_resnet50.pth \
     --model-backbone resnet50 \
