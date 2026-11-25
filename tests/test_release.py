@@ -97,5 +97,5 @@ def test_fatal_box_falls_back_to_stderr_off_windows(capsys):
 
     if sys.platform == "win32":
         pytest.skip("윈도우에서는 실제 메시지 상자가 뜹니다")
-    entry.fatal_box("BG Matte", "시작하지 못했습니다")
+    entry.fatal_box("GW_CCT_AI Matte Live", "시작하지 못했습니다")
     assert "시작하지 못했습니다" in capsys.readouterr().err

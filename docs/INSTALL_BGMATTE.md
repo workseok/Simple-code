@@ -1,4 +1,4 @@
-# BG Matte 앱 설치 가이드 (Windows / Mac 통합)
+# GW_CCT_AI Matte Live 앱 설치 가이드 (Windows / Mac 통합)
 
 이 문서는 설치 **입구**입니다. 순서대로 따라 하면 되고, 자세한 사용법·문제 해결은 OS별 문서로 연결됩니다.
 
@@ -32,7 +32,7 @@ git clone -b claude/determined-mccarthy-5aul8m https://github.com/workseok/simpl
 1. 풀린 폴더의 `packaging` → **`install_windows.bat`** 더블클릭
    ("Windows가 PC를 보호했습니다"가 뜨면 **추가 정보 → 실행**)
 2. 검은 창에서 10~30분 대기. 자동으로 하는 일: 파이썬 환경(`bgmatte`, Python 3.11) 생성 → PyTorch(NVIDIA GPU면 CUDA용 먼저 시도) → 라이브러리 → 엔진 코드 2종 + 가중치 5종 전부 다운로드 (약 540MB) → 바탕화면 바로가기 → 셀프체크
-3. "설치가 끝났습니다"가 나오면 완료. 바탕화면 **BG Matte** 실행
+3. "설치가 끝났습니다"가 나오면 완료. 바탕화면 **GW_CCT_AI Matte Live** 실행
 
 중간에 끊기면 `install_windows.bat`을 다시 실행하세요. 받은 것은 건너뛰고 이어서 진행합니다.
 
@@ -73,7 +73,7 @@ Miniforge는 파이썬 환경을 만들어 주는 도구(conda 배포판)입니�
    ```
 3. 엔진 코드·가중치: `bash packaging/install_engines.sh`
 4. 사전 점검: `python -m bgmatte_app.selfcheck`
-5. 앱 만들기: `bash packaging/build_app.sh --install` → `~/Applications/BG Matte.app`
+5. 앱 만들기: `bash packaging/build_app.sh --install` → `~/Applications/GW_CCT_AI Matte Live.app`
 
 처음 실행 시 카메라 권한 팝업에서 **허용**. 자세한 내용은 [APP_MAC.md](APP_MAC.md).
 

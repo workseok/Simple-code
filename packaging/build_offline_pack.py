@@ -1,4 +1,4 @@
-"""BG Matte 오프라인 팩 만들기 — '인터넷이 되는' 윈도우 PC에서 한 번 실행합니다.
+"""GW_CCT_AI Matte Live 오프라인 팩 만들기 — '인터넷이 되는' 윈도우 PC에서 한 번 실행합니다.
 
 만들어지는 것: dist/BGMatte_Offline_v<버전>/  (그리고 같은 이름의 .zip)
   install_offline.bat      ← 설치할 PC에서 더블클릭하는 파일
@@ -97,7 +97,7 @@ def download_wheels(wheels: Path, cuda_tags: Sequence[str]) -> List[str]:
 
 
 def write_manifest(pack: Path) -> None:
-    lines = [f"BG Matte 오프라인 팩 v{app_version()}  (python {PYTHON_VERSION}, win_amd64)", ""]
+    lines = [f"GW_CCT_AI Matte Live 오프라인 팩 v{app_version()}  (python {PYTHON_VERSION}, win_amd64)", ""]
     for path in sorted((pack / "offline").rglob("*")):
         if path.is_file() and path.name != "MANIFEST.txt":
             lines.append(f"{sha256(path)}  {path.relative_to(pack / 'offline').as_posix()}  {path.stat().st_size}")
@@ -157,7 +157,7 @@ def build(cuda_tags: Sequence[str], out_dir: Path, zip_it: bool = True) -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="BG Matte 오프라인 팩 만들기")
+    parser = argparse.ArgumentParser(description="GW_CCT_AI Matte Live 오프라인 팩 만들기")
     parser.add_argument("--cuda", action="append", help=f"담을 CUDA 버전 (cu126, cu128 …). 여러 번 지정 가능. 기본 {DEFAULT_CUDA}")
     parser.add_argument("--out", type=Path, default=ROOT / "dist", help="결과 폴더 (기본: dist)")
     parser.add_argument("--no-zip", action="store_true")

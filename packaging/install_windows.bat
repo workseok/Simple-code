@@ -3,14 +3,14 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
-title BG Matte 설치
+title GW_CCT_AI Matte Live 설치
 
 rem 프로젝트 폴더(이 파일의 상위 폴더)에서 실행합니다.
 cd /d "%~dp0.."
 
 echo.
 echo  ==============================================
-echo    BG Matte 윈도우 설치
+echo    GW_CCT_AI Matte Live 윈도우 설치
 echo    (인터넷 연결 필요, 약 1~3GB 다운로드, 10~30분)
 echo  ==============================================
 echo.
@@ -66,7 +66,7 @@ set RESULT=%ERRORLEVEL%
 echo.
 if "%RESULT%"=="0" (
     echo  ==============================================
-    echo    설치가 끝났습니다. 바탕화면의 'BG Matte'를 실행하세요.
+    echo    설치가 끝났습니다. 바탕화면의 'GW_CCT_AI Matte Live'를 실행하세요.
     echo  ==============================================
 ) else (
     echo  설치 중 문제가 있었습니다. 위 메시지를 확인해 주세요.

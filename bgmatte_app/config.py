@@ -16,7 +16,7 @@ from typing import Any, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
-APP_NAME = "BG Matte"
+APP_NAME = "GW_CCT_AI Matte Live"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # 매팅 엔진: bmv2 = BackgroundMattingV2(빈 배경 촬영 필요), rvm = 빈 배경 없이 사람만 분리

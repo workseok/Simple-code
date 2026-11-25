@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-rem BG Matte 실행 (install_windows.bat 으로 설치한 뒤 바탕화면 바로가기 또는 이 파일을 더블클릭)
+rem GW_CCT_AI Matte Live 실행 (install_windows.bat 으로 설치한 뒤 바탕화면 바로가기 또는 이 파일을 더블클릭)
 cd /d "%~dp0.."
 set PYTHONUTF8=1
 

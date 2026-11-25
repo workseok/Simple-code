@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# BG Matte.app 만들기 (macOS 전용)
+# GW_CCT_AI Matte Live.app 만들기 (macOS 전용)
 #
 # 사용법 (bgmatte 환경을 켠 상태에서):
 #   conda activate bgmatte
 #   pip install -r requirements-app.txt      # 최초 1회
-#   bash packaging/build_app.sh              # → dist/BG Matte.app
+#   bash packaging/build_app.sh              # → dist/GW_CCT_AI Matte Live.app
 #   bash packaging/build_app.sh --install    # → 위 + ~/Applications 에 복사
 #
 # 만들어지는 앱은 파이썬과 라이브러리를 '복사하지 않습니다'. 지금 켜 둔 conda 환경의
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-APP_NAME="BG Matte"
+APP_NAME="GW_CCT_AI Matte Live"
 EXEC_NAME="BGMatte"
 BUNDLE_ID="com.workseok.bgmatte"
 

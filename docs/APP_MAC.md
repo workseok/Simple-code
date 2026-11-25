@@ -1,4 +1,4 @@
-# BG Matte 앱 (macOS) 사용 가이드
+# GW_CCT_AI Matte Live 앱 (macOS) 사용 가이드
 
 기존 `realtime_matte.py`(`cv2.imshow` 미리보기)를 대신하는 GUI 앱입니다. 개인 Mac에서만 쓰는 것을
 전제로 하므로 서명·공증(notarization)은 하지 않습니다. 기존 CLI 스크립트는 그대로 남아 있습니다.
@@ -8,7 +8,7 @@
 ```bash
 conda activate bgmatte                   # 기존 환경 (torch, opencv 설치된 환경)
 pip install -r requirements-app.txt      # PySide6, pyobjc(카메라 권한 확인용) — 최초 1회
-bash packaging/build_app.sh              # → dist/BG Matte.app
+bash packaging/build_app.sh              # → dist/GW_CCT_AI Matte Live.app
 bash packaging/build_app.sh --install    # 위 + ~/Applications 에 복사
 ```
 
@@ -31,8 +31,8 @@ Intel Mac은 GPU 가속이 없어 CPU로 동작하므로 FPS가 낮을 수 있�
 
 ## 3. 첫 실행
 
-1. `BG Matte.app` 더블클릭 → 카메라 권한 팝업 → **허용**
-2. 팝업이 없고 화면이 검다면: 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → `BG Matte` 켜기
+1. `GW_CCT_AI Matte Live.app` 더블클릭 → 카메라 권한 팝업 → **허용**
+2. 팝업이 없고 화면이 검다면: 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → `GW_CCT_AI Matte Live` 켜기
 3. 첫 실행에는 사용 안내 창이 열립니다. 이후에는 `H` 키로 다시 볼 수 있습니다.
 4. `bgr.png`(피사체가 없는 빈 배경)가 없으면 **배경 촬영** 버튼 또는 스페이스바로 앱 안에서 촬영합니다.
    카운트다운 동안 화면 밖으로 비켜 주세요. 이전 `bgr.png`는 `bgr.prev.png`로 백업됩니다.

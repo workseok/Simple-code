@@ -1,4 +1,4 @@
-; BG Matte 설치 프로그램 (Inno Setup 6) — 윈도우에서 컴파일해 BGMatte_Setup.exe 를 만듭니다.
+; GW_CCT_AI Matte Live 설치 프로그램 (Inno Setup 6) — 윈도우에서 컴파일해 BGMatte_Setup.exe 를 만듭니다.
 ; 방법: docs/BUILD_SETUP_EXE.md
 ;
 ; 이 설치 프로그램은 앱 파일을 C:\BGMatte\app 에 복사한 뒤 packaging\install_windows.bat 을 실행합니다.
@@ -6,7 +6,7 @@
 ; 엔진 코드 폴더(..\BackgroundMattingV2, ..\RobustVideoMatting)가 앱 폴더 '옆'에 만들어져야 하므로
 ; 설치 위치는 C:\BGMatte\app 으로 고정합니다 (한글·공백이 없는 경로).
 
-#define AppName "BG Matte"
+#define AppName "GW_CCT_AI Matte Live"
 ; 버전은 bgmatte_app/__init__.py 의 __version__ 하나만 고치면 됩니다.
 ; build_release.bat / GitHub Actions 가 /DAppVersion=x.y.z 로 넘겨 줍니다 (직접 컴파일하면 0.0.0 으로 표시).
 #ifndef AppVersion
@@ -25,7 +25,7 @@ PrivilegesRequired=lowest
 OutputDir=Output
 OutputBaseFilename=BGMatte_Setup_v{#AppVersion}
 VersionInfoVersion={#AppVersion}
-VersionInfoDescription=BG Matte 설치 프로그램
+VersionInfoDescription=GW_CCT_AI Matte Live 설치 프로그램
 SetupIconFile=AppIcon.ico
 UninstallDisplayIcon={app}\packaging\AppIcon.ico
 Compression=lzma2
@@ -46,10 +46,11 @@ Source: "..\*"; DestDir: "{app}"; Excludes: ".git\*,.github\*,.pytest_cache\*,__
 
 [Run]
 ; 파이썬 환경 + 엔진 + 가중치 설치 (10~30분, 검은 창이 열립니다. 닫지 마세요)
-Filename: "{cmd}"; Parameters: "/c ""{app}\packaging\install_windows.bat"""; WorkingDir: "{app}\packaging"; StatusMsg: "BG Matte 환경을 설치하는 중입니다 (10~30분 걸립니다. 검은 창을 닫지 마세요)..."; Flags: waitUntilTerminated
+Filename: "{cmd}"; Parameters: "/c ""{app}\packaging\install_windows.bat"""; WorkingDir: "{app}\packaging"; StatusMsg: "GW_CCT_AI Matte Live 환경을 설치하는 중입니다 (10~30분 걸립니다. 검은 창을 닫지 마세요)..."; Flags: waitUntilTerminated
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
 Type: filesandordirs; Name: "{sd}\BGMatte\BackgroundMattingV2"
 Type: filesandordirs; Name: "{sd}\BGMatte\RobustVideoMatting"
+Type: filesandordirs; Name: "{userdesktop}\GW_CCT_AI Matte Live.lnk"
 Type: filesandordirs; Name: "{userdesktop}\BG Matte.lnk"

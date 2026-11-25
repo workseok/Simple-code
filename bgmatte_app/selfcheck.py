@@ -33,7 +33,7 @@ def _bad(text: str, hint: str = "") -> None:
 def main() -> int:
     cfg, warning = load_config()
     failed = False
-    print("BG Matte 셀프체크")
+    print("GW_CCT_AI Matte Live 셀프체크")
     print(f"  설정 파일: {config_path()}" + (" (없음 → 기본값 사용)" if not config_path().exists() else ""))
     if warning:
         _bad("설정 파일을 읽지 못해 기본값을 씁니다", warning)

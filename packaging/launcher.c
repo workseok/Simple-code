@@ -1,5 +1,5 @@
 /*
- * BG Matte 런처 — .app 번들의 실행 파일(Contents/MacOS/BGMatte)이 됩니다.
+ * GW_CCT_AI Matte Live 런처 — .app 번들의 실행 파일(Contents/MacOS/BGMatte)이 됩니다.
  *
  * 하는 일
  *   1. Contents/Resources/launch.conf 에서 (1행) 파이썬 경로, (2행) 프로젝트 폴더를 읽는다.
@@ -9,7 +9,7 @@
  * 왜 exec가 아니라 자식 프로세스인가
  *   macOS의 카메라 권한은 '책임 프로세스'(responsible process)에 붙는다. 이 런처를 책임
  *   프로세스로 남겨 두면 Info.plist의 NSCameraUsageDescription이 적용되어 권한 팝업에
- *   "BG Matte"로 표시된다. 런처가 exec로 파이썬으로 바뀌어 버리면 권한 대상이 파이썬
+ *   "GW_CCT_AI Matte Live"로 표시된다. 런처가 exec로 파이썬으로 바뀌어 버리면 권한 대상이 파이썬
  *   바이너리가 되어 팝업이 뜨지 않거나 앱이 강제 종료될 수 있다.
  *
  * 빌드: clang -O2 -Wall -o BGMatte launcher.c   (packaging/build_app.sh 가 수행)
@@ -61,7 +61,7 @@ static int self_path(char *buf, size_t size) {
 
 /* 사용자에게 보이는 오류 창. 따옴표/역슬래시는 셸 인젝션을 막기 위해 공백으로 바꾼다. */
 static void alert(const char *message) {
-    fprintf(stderr, "[BG Matte] %s\n", message);
+    fprintf(stderr, "[GW_CCT_AI Matte Live] %s\n", message);
 #ifdef __APPLE__
     char safe[1024];
     size_t j = 0;
@@ -72,7 +72,7 @@ static void alert(const char *message) {
     safe[j] = '\0';
     char cmd[2048];
     snprintf(cmd, sizeof cmd,
-             "/usr/bin/osascript -e 'display alert \"BG Matte\" message \"%s\" as critical' >/dev/null 2>&1",
+             "/usr/bin/osascript -e 'display alert \"GW_CCT_AI Matte Live\" message \"%s\" as critical' >/dev/null 2>&1",
              safe);
     (void)system(cmd);
 #endif
@@ -208,7 +208,7 @@ int main(void) {
     /* 사용자가 직접 종료한 경우가 아니라면 이유를 알려준다. */
     if (code != 0 && !g_forwarded) {
         char msg[PATH_MAX + 200];
-        snprintf(msg, sizeof msg, "BG Matte가 예기치 않게 종료되었습니다 (코드 %d).  로그: %s", code, logfile);
+        snprintf(msg, sizeof msg, "GW_CCT_AI Matte Live가 예기치 않게 종료되었습니다 (코드 %d).  로그: %s", code, logfile);
         alert(msg);
     }
     return code;

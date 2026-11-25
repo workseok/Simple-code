@@ -1,4 +1,4 @@
-"""BG Matte — 실시간 배경 매팅 GUI 앱.
+"""GW_CCT_AI Matte Live — 실시간 배경 매팅 GUI 앱.
 
 기존 CLI(realtime_matte.py, capture_background.py)는 그대로 두고,
 같은 utils.py / BackgroundMattingV2 모델을 GUI로 감싼 패키지입니다.

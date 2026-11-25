@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
-title BG Matte 오프라인 설치
+title GW_CCT_AI Matte Live 오프라인 설치
 
 rem 이 파일은 오프라인 팩의 맨 위 폴더에 있습니다. 인터넷에 접속하지 않습니다.
 set "PACK=%~dp0"
@@ -13,7 +13,7 @@ set "APP=%DEST%\app"
 
 echo.
 echo  ==============================================
-echo    BG Matte 오프라인 설치 (인터넷 필요 없음)
+echo    GW_CCT_AI Matte Live 오프라인 설치 (인터넷 필요 없음)
 echo    설치 위치: %DEST%   (약 10분)
 echo  ==============================================
 echo.
@@ -52,7 +52,7 @@ set RESULT=%ERRORLEVEL%
 echo.
 if "%RESULT%"=="0" (
     echo  ==============================================
-    echo    설치가 끝났습니다. 바탕화면의 'BG Matte'를 실행하세요.
+    echo    설치가 끝났습니다. 바탕화면의 'GW_CCT_AI Matte Live'를 실행하세요.
     echo  ==============================================
 ) else (
     echo  설치 중 문제가 있었습니다. 위 메시지를 확인해 주세요.

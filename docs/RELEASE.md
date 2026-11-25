@@ -34,7 +34,7 @@ Inno Setup 6 을 설치한 PC(`https://jrsoftware.org/isdl.php`)에서 `packagin
   이미 받은 가중치·엔진 코드는 건너뛰므로 처음 설치보다 훨씬 빠릅니다.
 - 설정(`%APPDATA%\BGMatte\config.json`)과 `models`, `backgrounds`, 빈 배경 이미지는 그대로 남습니다.
 - 앱을 켜 둔 채로 설치하지 말고, 먼저 종료해 주세요.
-- 실행 중인 버전은 앱 창 제목(예: `BG Matte 1.0.1`)에서 확인합니다.
+- 실행 중인 버전은 앱 창 제목(예: `GW_CCT_AI Matte Live 1.0.1`)에서 확인합니다.
 
 ## 3. 알아둘 점
 

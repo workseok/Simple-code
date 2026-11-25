@@ -83,13 +83,13 @@ def setup_logging(path: Optional[Path] = None) -> Optional[Path]:
 
 def main() -> int:
     log_file = setup_logging()
-    log.info("BG Matte 시작 (python %s)", sys.version.split()[0])
+    log.info("GW_CCT_AI Matte Live 시작 (python %s)", sys.version.split()[0])
 
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
     except ImportError as exc:
         fatal_box(
-            "BG Matte",
+            "GW_CCT_AI Matte Live",
             "PySide6를 불러올 수 없습니다.\n\n"
             "install_windows.bat 을 다시 실행해 설치를 마쳐 주세요.\n"
             f"원본 오류: {exc}" + (f"\n\n로그: {log_file}" if log_file else ""),
@@ -136,7 +136,7 @@ def _run() -> int:
         log.exception("시작 중 오류")
         from .config import log_path
 
-        fatal_box("BG Matte", f"시작하지 못했습니다.\n\n{exc}\n\n로그: {log_path()}")
+        fatal_box("GW_CCT_AI Matte Live", f"시작하지 못했습니다.\n\n{exc}\n\n로그: {log_path()}")
         return 1
 
 

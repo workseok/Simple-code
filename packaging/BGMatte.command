@@ -1,6 +1,6 @@
 #!/bin/bash
 # 대체 실행 방법: .app 대신 이 파일을 더블클릭하면 터미널에서 GUI 앱을 실행합니다.
-# (카메라 권한은 'BG Matte'가 아니라 터미널 앱에 붙습니다 — 기존 .command와 같은 방식)
+# (카메라 권한은 'GW_CCT_AI Matte Live'가 아니라 터미널 앱에 붙습니다 — 기존 .command와 같은 방식)
 # 처음 한 번만: chmod +x packaging/BGMatte.command
 
 cd "$(dirname "$0")/.." || exit 1

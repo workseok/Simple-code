@@ -67,7 +67,7 @@ def camera_permission_denied() -> Notice:
     return Notice(
         "camera_permission_denied", Level.ERROR, "카메라 권한이 꺼져 있습니다",
         "macOS가 이 앱의 카메라 사용을 막고 있습니다.",
-        "시스템 설정 → 개인정보 보호 및 보안 → 카메라에서 'BG Matte'(터미널로 실행했다면 "
+        "시스템 설정 → 개인정보 보호 및 보안 → 카메라에서 'GW_CCT_AI Matte Live'(터미널로 실행했다면 "
         "해당 터미널 앱)를 켠 뒤 '다시 시작'을 눌러 주세요.",
         ("open_camera_privacy", "restart"),
     )

@@ -19,7 +19,7 @@
 ## 3. 팀원이 쓰는 법
 
 1. `BGMatte_Setup.exe` 더블클릭 → 설치 → 검은 창에서 10~30분 대기 (인터넷 필요)
-2. 완료되면 바탕화면 **BG Matte** 실행
+2. 완료되면 바탕화면 **GW_CCT_AI Matte Live** 실행
 
 앱은 `C:\BGMatte\app` 에, 엔진 코드는 `C:\BGMatte\` 옆 폴더에 설치됩니다.
 `models`, `backgrounds`, `bgr.png` 는 설치 중에 만들어지거나 팀원이 각자 설정합니다.
@@ -29,4 +29,4 @@
 - 서명하지 않은 `.exe` 라서 처음 실행하면 "Windows가 PC를 보호했습니다"(SmartScreen)가 뜹니다. **추가 정보 → 실행**.
   없애려면 코드 서명 인증서가 필요합니다 (팀 내부 배포에는 보통 불필요).
 - 이 `.exe` 는 파이썬·PyTorch를 포함하지 않습니다. 설치 중 각 PC의 GPU에 맞춰 받기 때문에 NVIDIA PC는 CUDA용, 아닌 PC는 CPU용으로 자동 설치됩니다.
-- 제거: 윈도우 설정 → 앱 → BG Matte 제거. 앱 폴더, 엔진 코드 폴더, 바로가기가 삭제됩니다. conda 환경(`bgmatte`)은 남으므로 필요하면 `conda env remove -n bgmatte` 로 지웁니다.
+- 제거: 윈도우 설정 → 앱 → GW_CCT_AI Matte Live 제거. 앱 폴더, 엔진 코드 폴더, 바로가기가 삭제됩니다. conda 환경(`bgmatte`)은 남으므로 필요하면 `conda env remove -n bgmatte` 로 지웁니다.

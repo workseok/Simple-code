@@ -1,4 +1,4 @@
-"""BG Matte 윈도우 설치 도우미 (install_windows.bat 이 conda 환경을 만든 뒤 이 파일을 실행합니다).
+"""GW_CCT_AI Matte Live 윈도우 설치 도우미 (install_windows.bat 이 conda 환경을 만든 뒤 이 파일을 실행합니다).
 
 하는 일 (여러 번 실행해도 안전합니다 — 이미 있는 것은 건너뜁니다):
   1. PyTorch 설치: NVIDIA GPU가 있으면 CUDA 빌드를 시도하고, 안 되면 CPU 빌드로 내려갑니다.
@@ -296,19 +296,20 @@ def shortcut_command(python_exe: str = "", root: Path = ROOT) -> Tuple[str, str]
 
 
 def make_shortcut() -> None:
-    """바탕화면에 'BG Matte' 바로가기를 만듭니다 (실패해도 설치는 계속)."""
+    """바탕화면에 'GW_CCT_AI Matte Live' 바로가기를 만듭니다 (실패해도 설치는 계속)."""
     target, arguments = shortcut_command()
     icon = ROOT / "packaging" / "AppIcon.ico"
     ps = (
         "$d=[Environment]::GetFolderPath('Desktop');"
-        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'BG Matte.lnk'));"
+        "Remove-Item -LiteralPath (Join-Path $d 'BG Matte.lnk') -ErrorAction SilentlyContinue;"  # 예전 이름의 바로가기 정리
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'GW_CCT_AI Matte Live.lnk'));"
         f"$s.TargetPath='{target}';$s.Arguments='{arguments}';$s.WorkingDirectory='{ROOT}';"
         f"$s.IconLocation='{icon}';$s.Save();$d"
     )
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60)
         if out.returncode == 0:
-            say(f"  ✓ 바탕화면 바로가기를 만들었습니다: {out.stdout.strip()}\\BG Matte.lnk")
+            say(f"  ✓ 바탕화면 바로가기를 만들었습니다: {out.stdout.strip()}\\GW_CCT_AI Matte Live.lnk")
             if not arguments:
                 say("  · pythonw.exe 를 찾지 못해 검은 창이 함께 뜨는 방식으로 만들었습니다.")
         else:
@@ -325,7 +326,7 @@ def write_python_path() -> None:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="BG Matte 윈도우 설치 도우미")
+    parser = argparse.ArgumentParser(description="GW_CCT_AI Matte Live 윈도우 설치 도우미")
     parser.add_argument("--all-weights", action="store_true", help="(예전 옵션, 기본 동작과 같습니다)")
     parser.add_argument("--minimal", action="store_true", help="필수 가중치 2종만 받기")
     parser.add_argument("--cpu", action="store_true")
@@ -396,7 +397,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         say("설치는 끝났지만 아직 빠진 파일이 있습니다: " + ", ".join(missing))
         say("install_windows.bat 을 다시 실행해 주세요.")
         return 1
-    say("설치가 끝났습니다. 바탕화면의 'BG Matte'를 실행하세요. (설정 → 매팅 엔진에서 엔진을 고릅니다)")
+    say("설치가 끝났습니다. 바탕화면의 'GW_CCT_AI Matte Live'를 실행하세요. (설정 → 매팅 엔진에서 엔진을 고릅니다)")
     if not missing:
         say("엔진 코드 2종과 가중치 5종이 모두 이 PC에 있습니다. 이제 인터넷 연결 없이 사용할 수 있습니다.")
     else:

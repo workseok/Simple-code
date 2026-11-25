@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
-title BG Matte 배포 파일 만들기
+title GW_CCT_AI Matte Live 배포 파일 만들기
 rem 윈도우에서 BGMatte_Setup_vX.Y.Z.exe 를 만듭니다. (Inno Setup 6 필요: https://jrsoftware.org/isdl.php)
 rem 버전은 bgmatte_app\__init__.py 의 __version__ 에서 읽습니다.
 cd /d "%~dp0.."

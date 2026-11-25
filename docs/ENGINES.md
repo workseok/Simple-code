@@ -1,6 +1,6 @@
 # 매팅 엔진 가이드 (BackgroundMattingV2 · RobustVideoMatting)
 
-BG Matte는 인물을 분리하는 **엔진**을 설정에서 고를 수 있습니다. 엔진만 다르고 배경 합성, 번호 배경(1~9),
+GW_CCT_AI Matte Live는 인물을 분리하는 **엔진**을 설정에서 고를 수 있습니다. 엔진만 다르고 배경 합성, 번호 배경(1~9),
 알파 보기, 전체 화면, 테마, 설정 저장은 모두 같습니다.
 
 | | BackgroundMattingV2 (기본) | RobustVideoMatting (RVM) |
