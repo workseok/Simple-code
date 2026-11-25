@@ -5,6 +5,7 @@ from __future__ import annotations
 import faulthandler
 import logging
 import logging.handlers
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -81,6 +82,40 @@ def setup_logging(path: Optional[Path] = None) -> Optional[Path]:
     return log_file
 
 
+LEGACY_SHORTCUT = "BG Matte.lnk"
+
+
+def desktop_dir() -> Optional[Path]:
+    """윈도우 바탕화면 폴더 (OneDrive로 옮겨진 경우도 포함). 윈도우가 아니면 None."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+
+        buf = ctypes.create_unicode_buffer(260)
+        ctypes.windll.shell32.SHGetFolderPathW(None, 0x0000, None, 0, buf)  # CSIDL_DESKTOP
+        return Path(buf.value) if buf.value else None
+    except Exception:
+        return None
+
+
+def rename_legacy_shortcut(desktop: Optional[Path], new_name: str) -> bool:
+    """예전 이름('BG Matte')의 바탕화면 바로가기를 새 앱 이름으로 바꿉니다 (설치를 다시 하지 않아도 이름이 바뀜)."""
+    try:
+        if desktop is None:
+            return False
+        old, new = desktop / LEGACY_SHORTCUT, desktop / f"{new_name}.lnk"
+        if not old.is_file():
+            return False
+        if new.exists():
+            old.unlink()  # 새 이름이 이미 있으면 중복된 옛 바로가기만 정리
+        else:
+            old.rename(new)
+        return True
+    except Exception:
+        return False
+
+
 def main() -> int:
     log_file = setup_logging()
     log.info("GW_CCT_AI Matte Live 시작 (python %s)", sys.version.split()[0])
@@ -123,6 +158,8 @@ def main() -> int:
 
     sys.excepthook = excepthook
 
+    if rename_legacy_shortcut(desktop_dir(), APP_NAME):
+        log.info("바탕화면 바로가기 이름을 %s 로 바꿨습니다", APP_NAME)
     cfg, warning = load_config()
     window = MainWindow(cfg, startup_warning=warning)
     window.show()

@@ -99,3 +99,23 @@ def test_fatal_box_falls_back_to_stderr_off_windows(capsys):
         pytest.skip("윈도우에서는 실제 메시지 상자가 뜹니다")
     entry.fatal_box("GW_CCT_AI Matte Live", "시작하지 못했습니다")
     assert "시작하지 못했습니다" in capsys.readouterr().err
+
+
+def test_legacy_desktop_shortcut_is_renamed(tmp_path):
+    from bgmatte_app import __main__ as entry
+
+    (tmp_path / "BG Matte.lnk").write_text("x")
+    assert entry.rename_legacy_shortcut(tmp_path, "GW_CCT_AI Matte Live") is True
+    assert (tmp_path / "GW_CCT_AI Matte Live.lnk").is_file() and not (tmp_path / "BG Matte.lnk").exists()
+    assert entry.rename_legacy_shortcut(tmp_path, "GW_CCT_AI Matte Live") is False  # 다시 해도 안전
+
+
+def test_legacy_shortcut_duplicate_is_cleaned_and_missing_desktop_is_ignored(tmp_path):
+    from bgmatte_app import __main__ as entry
+
+    (tmp_path / "BG Matte.lnk").write_text("old")
+    (tmp_path / "GW_CCT_AI Matte Live.lnk").write_text("new")
+    assert entry.rename_legacy_shortcut(tmp_path, "GW_CCT_AI Matte Live") is True
+    assert (tmp_path / "GW_CCT_AI Matte Live.lnk").read_text() == "new" and not (tmp_path / "BG Matte.lnk").exists()
+    assert entry.rename_legacy_shortcut(None, "x") is False
+    assert entry.desktop_dir() is None or isinstance(entry.desktop_dir(), type(tmp_path))
